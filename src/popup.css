@@ -1,0 +1,107 @@
+:root {
+  color-scheme: light;
+  --paper: #f1ead8;
+  --ink: #171714;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 342px;
+  margin: 0;
+  background: #20211d;
+  color: var(--ink);
+  font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+}
+
+main {
+  display: grid;
+  min-height: 332px;
+  grid-template-columns: 30px 1fr;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(39,32,19,.02) 3px 4px),
+    var(--paper);
+}
+
+.perforation {
+  display: flex;
+  padding: 13px 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--ink);
+}
+
+.perforation i {
+  display: block;
+  width: 11px;
+  height: 22px;
+  border: 1px solid rgba(241,234,216,.65);
+}
+
+.ticket { padding: 25px 24px 22px; }
+
+.kicker {
+  margin: 0 0 21px;
+  font-family: "Courier New", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+h1 {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 400;
+  letter-spacing: -.04em;
+  line-height: .98;
+}
+
+h1 span { color: #007722; font-size: 28px; }
+
+.copy {
+  margin: 20px 0;
+  color: #686256;
+  font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.site-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(23,23,20,.18);
+  border-bottom: 1px solid rgba(23,23,20,.18);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+  letter-spacing: .07em;
+}
+
+.site-line em { flex: 1; border-top: 1px dashed rgba(23,23,20,.3); }
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.douban, .green { background: #00a13a; }
+.orange { background: #ff8000; }
+.blue { background: #40bcf4; }
+
+button {
+  display: flex;
+  width: 100%;
+  min-height: 45px;
+  margin-top: 16px;
+  padding: 0 15px;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+  color: white;
+  cursor: pointer;
+  font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+button:hover { background: #007722; }
+button:focus-visible { outline: 3px solid rgba(0,119,34,.35); outline-offset: 3px; }

@@ -1,0 +1,13 @@
+{
+  "name": "film-bridge-extension",
+  "version": "1.0.1",
+  "private": true,
+  "description": "A zero-build Chrome MV3 extension connecting Douban and Letterboxd film pages.",
+  "scripts": {
+    "check": "node --check src/shared.js && node --check src/widget-styles.js && node --check src/content.js && node --check src/background.js && node --check src/options.js && node --check src/popup.js",
+    "test": "node --test --test-isolation=none"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

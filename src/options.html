@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Film Bridge 设置</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="film-rail" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </aside>
+
+      <main>
+        <header class="masthead">
+          <div>
+            <p class="issue">PROJECTION NOTES · NO. 01</p>
+            <h1>Film<br>Bridge</h1>
+          </div>
+          <p class="lede">让同一部电影在豆瓣与 Letterboxd 之间，只有一次点击的距离。</p>
+        </header>
+
+        <form id="settings-form">
+          <section class="settings-section" aria-labelledby="behavior-title">
+            <div class="section-number">01</div>
+            <div class="section-copy">
+              <p class="overline">BEHAVIOR</p>
+              <h2 id="behavior-title">页面行为</h2>
+              <p>入口会自动嵌在电影标题下方；这些选项可以控制跳转、评分加载和页面内显示方式。</p>
+            </div>
+            <div class="controls">
+              <label class="switch-row">
+                <span>
+                  <strong>在新标签页打开</strong>
+                  <small>保留当前电影页面</small>
+                </span>
+                <input id="open-in-new-tab" type="checkbox">
+                <i aria-hidden="true"></i>
+              </label>
+
+              <label class="switch-row">
+                <span>
+                  <strong>显示评分票根</strong>
+                  <small>关闭后只保留跨站按钮</small>
+                </span>
+                <input id="show-ratings" type="checkbox">
+                <i aria-hidden="true"></i>
+              </label>
+
+              <label class="field-row compact">
+                <span>
+                  <strong>豆瓣页面显示</strong>
+                  <small>选择豆瓣与 Letterboxd 评分的组合</small>
+                </span>
+                <select id="douban-rating-display" aria-label="豆瓣页面评分显示方式">
+                  <option value="both">豆瓣 + Letterboxd</option>
+                  <option value="douban">仅豆瓣</option>
+                  <option value="letterboxd">仅 Letterboxd</option>
+                </select>
+              </label>
+
+              <label class="field-row compact">
+                <span>
+                  <strong>Letterboxd 页面显示</strong>
+                  <small>可只保留豆瓣评分</small>
+                </span>
+                <select id="letterboxd-rating-display" aria-label="Letterboxd 页面评分显示方式">
+                  <option value="both">豆瓣 + Letterboxd</option>
+                  <option value="douban">仅豆瓣</option>
+                  <option value="letterboxd">仅 Letterboxd</option>
+                </select>
+              </label>
+
+              <label class="field-row compact">
+                <span>
+                  <strong>评分缓存</strong>
+                  <small>减少对电影站点和 API 的请求</small>
+                </span>
+                <select id="cache-hours">
+                  <option value="6">6 小时</option>
+                  <option value="24">24 小时</option>
+                  <option value="72">3 天</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-section" aria-labelledby="sources-title">
+            <div class="section-number">02</div>
+            <div class="section-copy">
+              <p class="overline">OPTIONAL SOURCES</p>
+              <h2 id="sources-title">更多评分</h2>
+              <p>豆瓣和 Letterboxd 无需密钥。下面两项完全可选，只在浏览电影页时从对应 API 读取公开评分。</p>
+            </div>
+            <div class="controls api-controls">
+              <div class="api-card">
+                <div class="api-heading">
+                  <span class="source-mark omdb">OMDb</span>
+                  <span class="permission" id="omdb-permission">未启用</span>
+                </div>
+                <label for="omdb-key">API Key</label>
+                <div class="secret-field">
+                  <input id="omdb-key" name="omdb-key" type="password" autocomplete="off" spellcheck="false" placeholder="输入 OMDb API Key">
+                  <button type="button" data-reveal="omdb-key" aria-label="显示或隐藏 OMDb API Key">显示</button>
+                </div>
+                <p>提供 IMDb 用户评分与 Metacritic Metascore。<a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noreferrer">申请 OMDb Key ↗</a></p>
+              </div>
+
+              <div class="api-card">
+                <div class="api-heading">
+                  <span class="source-mark tmdb">TMDB</span>
+                  <span class="permission" id="tmdb-permission">未启用</span>
+                </div>
+                <label for="tmdb-credential">Read Access Token 或 API Key</label>
+                <div class="secret-field">
+                  <input id="tmdb-credential" name="tmdb-credential" type="password" autocomplete="off" spellcheck="false" placeholder="推荐粘贴 Read Access Token">
+                  <button type="button" data-reveal="tmdb-credential" aria-label="显示或隐藏 TMDB 凭据">显示</button>
+                </div>
+                <p>提供 TMDB 用户评分。<a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">打开 TMDB API 设置 ↗</a></p>
+              </div>
+
+              <div class="privacy-note">
+                <strong>凭据只保存在这台浏览器。</strong>
+                <span>使用 <code>chrome.storage.local</code>，不会写入网页，也不会发送给豆瓣或 Letterboxd。</span>
+              </div>
+            </div>
+          </section>
+
+          <footer class="form-footer">
+            <p id="status" role="status" aria-live="polite">更改设置后，已打开的电影页将在下次进入时采用新设置。</p>
+            <div class="footer-actions">
+              <button class="secondary-button" id="clear-cache" type="button">清空评分缓存</button>
+              <button class="primary-button" type="submit">保存设置 <span>→</span></button>
+            </div>
+          </footer>
+        </form>
+
+        <footer class="credits">
+          <span>FILM BRIDGE / 1.0.1</span>
+          <span>豆瓣 ↔ LETTERBOXD</span>
+        </footer>
+      </main>
+    </div>
+    <script src="options.js"></script>
+  </body>
+</html>
