@@ -1,6 +1,12 @@
 # Film Bridge · 豆瓣 ↔ Letterboxd
 
-一个无需构建的 Chrome Manifest V3 扩展。进入豆瓣或 Letterboxd 的电影详情页时，它会把同一块“电影票根”直接嵌在影片标题下方，提供双向跳转和跨站评分。
+一个无需构建的 Chrome / Edge Manifest V3 扩展：当你浏览豆瓣或 Letterboxd 的电影详情页时，Film Bridge 会把跨站评分与跳转入口直接嵌入当前页面，让两套电影资料之间只隔一次点击。
+
+项目完全在浏览器本地运行，不需要开发者服务器、账号系统或构建工具。核心功能不依赖任何 API Key；OMDb 和 TMDB 只是可选的扩展评分来源。
+
+![Manifest V3](https://img.shields.io/badge/Manifest-V3-087B50)
+![Version](https://img.shields.io/badge/version-1.0.1-2f6f8f)
+![License](https://img.shields.io/badge/license-MIT-111111)
 
 ## 现在已经支持
 
@@ -10,9 +16,18 @@
 - Letterboxd → 豆瓣：用片名（包括英文副标题）搜索候选，并用年份、标题相似度与候选差距做置信判断；不确定时宁可打开搜索结果，也不会武断地跳到同名电影。
 - 直接显示当前页面上的豆瓣或 Letterboxd 用户评分。
 - 尽力补全另一站评分；豆瓣页面中观察到的条目、ID 与评分会保存在本地，之后访问相应 Letterboxd 页面可直接复用。
+- 可在设置页分别控制两个站点的评分卡：显示“豆瓣 + Letterboxd”、仅豆瓣或仅 Letterboxd。
 - 可选接入 OMDb（IMDb + Metacritic）与 TMDB 评分；不填 API 凭据不影响核心双向跳转。
 - 未上映或暂无评分时显示“—”，不会错误地显示为 0 分。
+- 浅色豆瓣页面与深色 Letterboxd 页面分别适配的评分摘要 UI。
 - Shadow DOM 样式隔离、键盘焦点样式、响应式布局和减少动态效果偏好。
+
+## 典型使用场景
+
+- 在豆瓣看完一部电影，想快速打开 Letterboxd 的影评、日志或评分分布。
+- 在 Letterboxd 发现电影，想回到豆瓣查看中文资料、短评和本地评分。
+- 只想在豆瓣页面看 Letterboxd 评分，或只想在 Letterboxd 页面看豆瓣评分。
+- 需要同时参考 IMDb、TMDB 或 Metacritic 的公开评分。
 
 ## 安装
 
@@ -28,6 +43,17 @@ Chrome 不会把刚安装的内容脚本追溯注入到安装前就已经打开�
 
 - 豆瓣：<https://movie.douban.com/subject/3541415/>
 - Letterboxd：<https://letterboxd.com/film/inception/>
+
+支持 Chrome、Edge、Brave 等 Chromium 浏览器。扩展更新后，在扩展管理页点击“重新加载”；已经打开的旧标签页通常需要刷新一次，之后站内无刷新切换电影不需要再次刷新。
+
+## 页面内评分卡
+
+评分卡只保留两类核心操作：
+
+1. 查看当前页和另一站的评分。
+2. 点击按钮跳转到另一站的电影详情页。
+
+卡片会根据所在站点自动切换浅色或深色配色，并在窄屏下改为纵向布局。评分来源、匹配过程和 API 设置不占用页面内容区，统一放在扩展选项页中。
 
 ## 可选评分设置
 
@@ -106,3 +132,38 @@ tools/                # 图标生成脚本
 本扩展解析的是网站公开页面结构，豆瓣和 Letterboxd 未记录在案的页面改版可能需要更新选择器。外部评分归各数据源所有；扩展只做即时展示，不批量采集、不上传浏览记录。
 
 Chrome MV3 相关实现遵循官方的[跨域网络请求](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)、[Manifest 图标](https://developer.chrome.com/docs/extensions/reference/manifest/icons)和[设置页](https://developer.chrome.com/docs/extensions/develop/ui/options-page)规范。
+
+## 常见问题
+
+### 为什么按钮出现了，但另一站评分是“—”？
+
+跳转和评分是两条独立链路。目标站点可能触发安全验证、限流或暂时没有公开评分；这时扩展仍会保留可用的搜索或详情页入口，不会把缺失评分当成 0 分。
+
+### 为什么同名电影没有自动直达？
+
+当 IMDb / TMDB ID 不足，且片名与年份无法唯一确认时，扩展会打开目标站搜索页，避免把同名电影误认为同一部影片。
+
+### API Key 会上传到项目或网站吗？
+
+不会。OMDb / TMDB 凭据只保存在当前浏览器的 `chrome.storage.local`，并只用于请求对应官方 API；项目没有开发者后端，也不会把凭据发送给豆瓣或 Letterboxd。
+
+## 开发与贡献
+
+项目没有构建步骤，源码修改后在 `chrome://extensions` 点击“重新加载”即可验证。
+
+提交修改前请运行：
+
+```powershell
+npm run check
+npm test
+```
+
+如果豆瓣或 Letterboxd 改变页面结构，欢迎提交 Issue，并附上脱敏后的页面结构、浏览器版本和扩展控制台错误；不要上传 Cookie、API Key 或私人观影记录。
+
+## 当前版本
+
+`v1.0.1`：评分优先的内嵌 UI、豆瓣 / Letterboxd 页面评分显示选项、跨站跳转与可选 IMDb / TMDB / Metacritic 评分。
+
+## 免责声明
+
+Film Bridge 是独立的非官方工具，与豆瓣、Letterboxd、IMDb、TMDB、Metacritic、Google 或 Microsoft 不存在隶属、授权、赞助或背书关系。相关名称、商标和服务归各自权利人所有。使用者应自行遵守相关网站的服务条款与所在地区适用的法律法规。
