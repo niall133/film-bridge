@@ -19,7 +19,7 @@
             <p class="issue">PROJECTION NOTES · NO. 01</p>
             <h1>Film<br>Bridge</h1>
           </div>
-          <p class="lede">让同一部电影在豆瓣与 Letterboxd 之间，只有一次点击的距离。</p>
+          <p class="lede">让同一部电影在豆瓣、Letterboxd、IMDb、TMDB 与 Metacritic 之间，只有一次点击的距离。</p>
         </header>
 
         <form id="settings-form">
@@ -42,36 +42,51 @@
 
               <label class="switch-row">
                 <span>
-                  <strong>显示评分票根</strong>
-                  <small>关闭后只保留跨站按钮</small>
+                  <strong>显示评分卡</strong>
+                  <small>关闭后隐藏页面内评分与跳转入口</small>
                 </span>
                 <input id="show-ratings" type="checkbox">
                 <i aria-hidden="true"></i>
               </label>
 
-              <label class="field-row compact">
-                <span>
-                  <strong>豆瓣页面显示</strong>
-                  <small>选择豆瓣与 Letterboxd 评分的组合</small>
-                </span>
-                <select id="douban-rating-display" aria-label="豆瓣页面评分显示方式">
-                  <option value="both">豆瓣 + Letterboxd</option>
-                  <option value="douban">仅豆瓣</option>
-                  <option value="letterboxd">仅 Letterboxd</option>
-                </select>
-              </label>
+              <div class="rating-visibility" id="rating-visibility-controls" data-all-off="false">
+                <div class="rating-visibility-header">
+                  <span>
+                    <strong>评分来源显示</strong>
+                    <small id="rating-visibility-status">5 个评分来源均已开启</small>
+                  </span>
+                  <div class="rating-visibility-actions">
+                    <button type="button" class="tiny-button" id="enable-all-ratings">全部打开</button>
+                    <button type="button" class="tiny-button" id="disable-all-ratings">全部关闭</button>
+                  </div>
+                </div>
 
-              <label class="field-row compact">
-                <span>
-                  <strong>Letterboxd 页面显示</strong>
-                  <small>可只保留豆瓣评分</small>
-                </span>
-                <select id="letterboxd-rating-display" aria-label="Letterboxd 页面评分显示方式">
-                  <option value="both">豆瓣 + Letterboxd</option>
-                  <option value="douban">仅豆瓣</option>
-                  <option value="letterboxd">仅 Letterboxd</option>
-                </select>
-              </label>
+                <label class="switch-row rating-switch-row">
+                  <span><strong>豆瓣评分</strong><small>在豆瓣和其他详情页显示</small></span>
+                  <input id="show-douban-rating" data-rating-switch="douban" type="checkbox" checked>
+                  <i aria-hidden="true"></i>
+                </label>
+                <label class="switch-row rating-switch-row">
+                  <span><strong>Letterboxd 评分</strong><small>显示用户平均评分</small></span>
+                  <input id="show-letterboxd-rating" data-rating-switch="letterboxd" type="checkbox" checked>
+                  <i aria-hidden="true"></i>
+                </label>
+                <label class="switch-row rating-switch-row">
+                  <span><strong>IMDb 评分</strong><small>有可用 OMDb Key 或当前 IMDb 页面评分时显示</small></span>
+                  <input id="show-imdb-rating" data-rating-switch="imdb" type="checkbox" checked>
+                  <i aria-hidden="true"></i>
+                </label>
+                <label class="switch-row rating-switch-row">
+                  <span><strong>TMDB 评分</strong><small>有可用 TMDB 凭据或当前 TMDB 页面评分时显示</small></span>
+                  <input id="show-tmdb-rating" data-rating-switch="tmdb" type="checkbox" checked>
+                  <i aria-hidden="true"></i>
+                </label>
+                <label class="switch-row rating-switch-row">
+                  <span><strong>Metascore</strong><small>显示 Metacritic 专家分，并可跳转官网</small></span>
+                  <input id="show-metacritic-rating" data-rating-switch="metacritic" type="checkbox" checked>
+                  <i aria-hidden="true"></i>
+                </label>
+              </div>
 
               <label class="field-row compact">
                 <span>
@@ -104,6 +119,7 @@
                 <div class="secret-field">
                   <input id="omdb-key" name="omdb-key" type="password" autocomplete="off" spellcheck="false" placeholder="输入 OMDb API Key">
                   <button type="button" data-reveal="omdb-key" aria-label="显示或隐藏 OMDb API Key">显示</button>
+                  <button type="button" class="clear-credential" data-clear-credential="omdb-key" data-clear-key="omdbApiKey" data-clear-origin="https://www.omdbapi.com/*">清除</button>
                 </div>
                 <p>提供 IMDb 用户评分与 Metacritic Metascore。<a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noreferrer">申请 OMDb Key ↗</a></p>
               </div>
@@ -117,6 +133,7 @@
                 <div class="secret-field">
                   <input id="tmdb-credential" name="tmdb-credential" type="password" autocomplete="off" spellcheck="false" placeholder="推荐粘贴 Read Access Token">
                   <button type="button" data-reveal="tmdb-credential" aria-label="显示或隐藏 TMDB 凭据">显示</button>
+                  <button type="button" class="clear-credential" data-clear-credential="tmdb-credential" data-clear-key="tmdbCredential" data-clear-origin="https://api.themoviedb.org/*">清除</button>
                 </div>
                 <p>提供 TMDB 用户评分。<a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">打开 TMDB API 设置 ↗</a></p>
               </div>
@@ -138,8 +155,8 @@
         </form>
 
         <footer class="credits">
-          <span>FILM BRIDGE / 1.0.1</span>
-          <span>豆瓣 ↔ LETTERBOXD</span>
+          <span>FILM BRIDGE / 1.0.8</span>
+          <span>豆瓣 · LETTERBOXD · IMDb · TMDB · METACRITIC</span>
         </footer>
       </main>
     </div>

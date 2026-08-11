@@ -18,6 +18,7 @@
     metacritic: { label: "METASCORE", max: 100, color: "#56a53f" }
   });
   const PRIMARY_RATING_KEYS = new Set(["douban", "letterboxd"]);
+  const OPTIONAL_RATING_KEYS = new Set(["imdb", "tmdb", "metacritic"]);
 
   let activePageKey = "";
   let activeFilmSignature = "";
@@ -33,6 +34,18 @@
     }
     if (location.hostname === "letterboxd.com" && /^\/film\/[^/]+\/?$/.test(location.pathname)) {
       return "letterboxd";
+    }
+    if (["imdb.com", "www.imdb.com"].includes(location.hostname)
+      && /^\/title\/tt\d{5,12}(?:\/criticreviews)?\/?$/i.test(location.pathname)) {
+      return "imdb";
+    }
+    if (["themoviedb.org", "www.themoviedb.org"].includes(location.hostname)
+      && /^\/(?:movie|tv)\/\d+(?:-[^/]+)?\/?$/.test(location.pathname)) {
+      return "tmdb";
+    }
+    if (["metacritic.com", "www.metacritic.com"].includes(location.hostname)
+      && /^\/movie\/[^/]+\/?$/.test(location.pathname)) {
+      return "metacritic";
     }
     return null;
   }
@@ -59,7 +72,9 @@
       try {
         for (const item of flattenJsonLd(JSON.parse(raw))) {
           const types = Array.isArray(item["@type"]) ? item["@type"] : [item["@type"]];
-          if (types.some((type) => String(type).toLowerCase() === "movie")) results.push(item);
+          if (types.some((type) => ["movie", "tvseries", "tvshow", "series"].includes(String(type).toLowerCase()))) {
+            results.push(item);
+          }
         }
       } catch {
         // A malformed third-party JSON-LD block must not prevent the page button.
@@ -81,6 +96,73 @@
     if (!normalized) return null;
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function parseScoreText(value, max) {
+    const text = Shared.normalizeWhitespace(value);
+    if (!text) return null;
+    const match = text.match(/(\d{1,3}(?:\.\d+)?)\s*(?:\/\s*(\d{1,3})|out of\s*(\d{1,3})|%|$)/i);
+    if (!match) return null;
+    const rawValue = Number(match[1]);
+    const rawScale = Number(match[2] || match[3] || max);
+    if (!Number.isFinite(rawValue) || !Number.isFinite(rawScale) || rawScale <= 0) return null;
+    const normalized = text.includes("%") ? rawValue : rawValue * (max / rawScale);
+    return Shared.finiteRating(normalized, 0.1, max);
+  }
+
+  function firstExactRating(selectors, max) {
+    for (const selector of selectors) {
+      for (const element of document.querySelectorAll(selector)) {
+        const text = Shared.normalizeWhitespace(element.textContent);
+        if (!/^\d{1,3}(?:\.\d+)?$/.test(text)) continue;
+        const rating = Shared.finiteRating(text, 0.1, max);
+        if (rating != null) return rating;
+      }
+    }
+    return null;
+  }
+
+  function isImdbReviewSectionHeading(value) {
+    return /^(?:metacritic|critic|external)\s+reviews?$|^reviews?$|^criticreviews$/i.test(
+      Shared.normalizeWhitespace(value)
+    );
+  }
+
+  function cleanImdbPageTitle(value) {
+    return Shared.cleanTitle(
+      Shared.normalizeWhitespace(value)
+        .replace(/\s*[-–—]\s*(?:metacritic|critic|external)\s+reviews?\s*[-–—]\s*IMDb.*$/i, "")
+        .replace(/\s*[-–—]\s*IMDb\s*$/i, "")
+    );
+  }
+
+  function findImdbFilmHeading() {
+    const selectors = [
+      '[data-testid="hero__pageTitle"]',
+      '[data-testid="hero-title-block"] h1',
+      'main h1',
+      'main h2',
+      'h1',
+      'h2'
+    ];
+    for (const selector of selectors) {
+      for (const element of document.querySelectorAll(selector)) {
+        const value = cleanImdbPageTitle(element.textContent);
+        if (value && !isImdbReviewSectionHeading(value)) return element;
+      }
+    }
+    return null;
+  }
+
+  function firstImdbFilmTitle() {
+    const heading = findImdbFilmHeading();
+    const headingTitle = cleanImdbPageTitle(heading?.textContent);
+    if (headingTitle && !isImdbReviewSectionHeading(headingTitle)) return headingTitle;
+    for (const element of document.querySelectorAll('a[href*="/title/tt"]')) {
+      const value = cleanImdbPageTitle(element.textContent);
+      if (value && !isImdbReviewSectionHeading(value) && value.length <= 180) return value;
+    }
+    return "";
   }
 
   function extractDoubanFilm() {
@@ -176,15 +258,181 @@
     });
   }
 
+  function extractImdbFilm() {
+    const jsonLd = readJsonLdMovies()[0] ?? null;
+    const metaTitle = document.querySelector('meta[property="og:title"]')?.content;
+    const domTitle = firstImdbFilmTitle();
+    const titleCandidates = [
+      jsonLd?.name,
+      domTitle,
+      metaTitle,
+      document.title
+    ]
+      .map(cleanImdbPageTitle)
+      .filter((candidate) => candidate && !isImdbReviewSectionHeading(candidate));
+    const title = titleCandidates[0] || "";
+    const year = Shared.parseYear(jsonLd?.datePublished)
+      || Shared.parseYear(firstText([
+        '[data-testid="title-details-releasedate"]',
+        'a[href*="/releaseinfo"]',
+        '[data-testid="title-details-releasedate"] a'
+      ]))
+      || Shared.parseYear(metaTitle)
+      || Shared.parseYear(document.title);
+    const aggregate = jsonLd?.aggregateRating;
+    const ratingCount = parseCount(aggregate?.ratingCount);
+    const rating = Shared.finiteRating(aggregate?.ratingValue, 0.1, 10)
+      || parseScoreText(firstText([
+        '[data-testid="hero-rating-bar__aggregate-rating__score"]',
+        '[data-testid*="aggregate-rating"]',
+        '[class*="aggregate-rating"]'
+      ]), 10);
+    const imdbId = Shared.normalizeImdbId(location.pathname.match(/\/title\/(tt\d{5,12})/i)?.[1])
+      || Shared.normalizeImdbId(document.querySelector('link[rel="canonical"]')?.href)
+      || Shared.normalizeImdbId(document.querySelector('meta[property="og:url"]')?.content);
+    const tmdbHref = document.querySelector('a[href*="themoviedb.org/"]')?.href;
+    return Shared.sanitizeFilmPayload({
+      source: "imdb",
+      title,
+      alternateTitles: Shared.uniqueStrings([jsonLd?.alternateName, metaTitle, domTitle, document.title])
+        .map(cleanImdbPageTitle)
+        .filter((candidate) => Shared.normalizeTitle(candidate) !== Shared.normalizeTitle(title)),
+      year,
+      imdbId,
+      tmdbId: Shared.normalizeTmdbId(tmdbHref?.match(/\/(?:movie|tv)\/(\d+)/i)?.[1]),
+      tmdbType: /\/tv\//i.test(tmdbHref ?? "") ? "tv" : "movie",
+      localId: imdbId,
+      rating,
+      ratingCount,
+      pageUrl: location.href
+    });
+  }
+
+  function extractTmdbFilm() {
+    const jsonLd = readJsonLdMovies()[0] ?? null;
+    const pathMatch = location.pathname.match(/^\/(movie|tv)\/(\d+)/);
+    const tmdbType = pathMatch?.[1] === "tv" ? "tv" : "movie";
+    const tmdbId = Shared.normalizeTmdbId(pathMatch?.[2]);
+    const domTitle = firstText([
+      "h2.title",
+      '[data-testid="hero__pageTitle"]',
+      "main h1",
+      "main h2",
+      "h1"
+    ]);
+    const metaTitle = document.querySelector('meta[property="og:title"]')?.content;
+    const title = Shared.cleanTitle(jsonLd?.name || domTitle || metaTitle || document.title);
+    const year = Shared.parseYear(jsonLd?.datePublished)
+      || Shared.parseYear(firstText([
+        ".release_date",
+        '[class*="release_date"]',
+        '[data-testid*="release"]'
+      ]))
+      || Shared.parseYear(metaTitle);
+    const aggregate = jsonLd?.aggregateRating;
+    const ratingCount = parseCount(aggregate?.ratingCount);
+    const chartPercent = document.querySelector("[data-percent]")?.getAttribute("data-percent");
+    const chartRating = chartPercent == null ? null : Shared.finiteRating(Number(chartPercent) / 10, 0.1, 10);
+    const rating = Shared.finiteRating(aggregate?.ratingValue, 0.1, 10)
+      || chartRating
+      || parseScoreText(firstText([
+        ".user_score",
+        ".user_score_chart",
+        '[data-testid*="user-score"]',
+        '[data-testid*="rating"]'
+      ]), 10);
+    const infoText = firstText([
+      ".user_score",
+      ".user_score_chart",
+      '[data-testid*="user-score"]',
+      '[data-testid*="rating"]'
+    ]);
+    const visibleCount = parseCount(infoText.match(/([\d,]+)\s*(?:votes?|ratings?)/i)?.[1]);
+    const imdbHref = document.querySelector('a[href*="imdb.com/title/"]')?.href;
+    return Shared.sanitizeFilmPayload({
+      source: "tmdb",
+      title,
+      alternateTitles: Shared.uniqueStrings([jsonLd?.alternateName, metaTitle, domTitle])
+        .filter((candidate) => Shared.normalizeTitle(candidate) !== Shared.normalizeTitle(title)),
+      year,
+      imdbId: Shared.normalizeImdbId(imdbHref),
+      tmdbId,
+      tmdbType,
+      localId: `${tmdbType}-${tmdbId || ""}`,
+      rating,
+      ratingCount: ratingCount ?? visibleCount,
+      pageUrl: location.href
+    });
+  }
+
+  function extractMetacriticFilm() {
+    const jsonLd = readJsonLdMovies()[0] ?? null;
+    const heading = document.querySelector("main h1") || document.querySelector("h1");
+    const domTitle = Shared.normalizeWhitespace(heading?.textContent);
+    const metaTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
+    const metaMovieTitle = Shared.normalizeWhitespace(metaTitle)
+      .replace(/\s+(?:Reviews?|Details)\s*[-–—]\s*Metacritic.*$/i, "")
+      .replace(/\s*[-–—]\s*Metacritic.*$/i, "");
+    const title = Shared.cleanTitle(jsonLd?.name || domTitle || metaMovieTitle);
+    const headingContext = Shared.normalizeWhitespace(heading?.parentElement?.textContent);
+    const mainText = Shared.normalizeWhitespace(document.querySelector("main")?.textContent);
+    const year = Shared.parseYear(jsonLd?.datePublished)
+      || Shared.parseYear(headingContext)
+      || Shared.parseYear(mainText);
+    const metaDescription = document.querySelector('meta[name="description"]')?.content
+      || document.querySelector('meta[property="og:description"]')?.content;
+    const rating = firstExactRating([
+        '[data-testid*="metascore"]',
+        '[class*="productScoreInfo_scoreNumber"]',
+        '[class*="siteReviewScore_background"]',
+        '[class*="metascore"] [class*="score"]',
+        '[class*="critic"] [class*="score"]'
+      ], 100)
+      || Shared.finiteRating(
+        String(metaDescription ?? "").match(/Metascore\D{0,24}(\d{1,3})/i)?.[1],
+        0.1,
+        100
+      );
+    const ratingCount = parseCount(
+      mainText.match(/Based on\s+([\d,]+)\s+Critic Reviews?/i)?.[1]
+      || jsonLd?.aggregateRating?.ratingCount
+    );
+    const pageMarkup = document.documentElement?.innerHTML ?? "";
+    const imdbId = Shared.normalizeImdbId(
+      document.querySelector('a[href*="imdb.com/title/"]')?.href
+      || pageMarkup.match(/(?:imdbTitleId|imdbId|imdb_id)[\s\S]{0,80}?(tt\d{7,12})/i)?.[1]
+    );
+    const localId = location.pathname.match(/^\/movie\/([^/]+)/)?.[1] ?? null;
+
+    return Shared.sanitizeFilmPayload({
+      source: "metacritic",
+      title,
+      alternateTitles: Shared.uniqueStrings([jsonLd?.alternateName, metaMovieTitle, domTitle])
+        .filter((candidate) => Shared.normalizeTitle(candidate) !== Shared.normalizeTitle(title)),
+      year,
+      imdbId,
+      localId,
+      rating,
+      ratingCount,
+      pageUrl: location.href
+    });
+  }
+
   function extractFilm(source) {
-    return source === "douban" ? extractDoubanFilm() : extractLetterboxdFilm();
+    if (source === "douban") return extractDoubanFilm();
+    if (source === "letterboxd") return extractLetterboxdFilm();
+    if (source === "imdb") return extractImdbFilm();
+    if (source === "tmdb") return extractTmdbFilm();
+    if (source === "metacritic") return extractMetacriticFilm();
+    return null;
   }
 
   function pageDomMatchesLocation(source) {
     const jsonLd = readJsonLdMovies()[0] ?? null;
     const canonicalValue = jsonLd?.url
       || jsonLd?.["@id"]
-      || document.querySelector('meta[property="og:url"]')?.content;
+      || document.querySelector('meta[property="og:url"]')?.content
+      || document.querySelector('link[rel="canonical"]')?.href;
     if (!canonicalValue) return true;
 
     try {
@@ -194,9 +442,24 @@
         const documentId = canonical.pathname.match(/^\/subject\/(\d+)\/?$/)?.[1];
         return !documentId || documentId === expectedId;
       }
-      const expectedPath = location.pathname.replace(/\/+$/, "");
-      const documentPath = canonical.pathname.replace(/\/+$/, "");
-      return !documentPath.startsWith("/film/") || documentPath === expectedPath;
+      if (source === "letterboxd") {
+        const expectedPath = location.pathname.replace(/\/+$/, "");
+        const documentPath = canonical.pathname.replace(/\/+$/, "");
+        return !documentPath.startsWith("/film/") || documentPath === expectedPath;
+      }
+      if (source === "imdb") {
+        const expectedId = location.pathname.match(/^\/title\/(tt\d{5,12})/i)?.[1]?.toLowerCase();
+        const documentId = canonical.pathname.match(/^\/title\/(tt\d{5,12})/i)?.[1]?.toLowerCase();
+        return !documentId || documentId === expectedId;
+      }
+      if (source === "metacritic") {
+        const expectedPath = location.pathname.replace(/\/+$/, "");
+        const documentPath = canonical.pathname.replace(/\/+$/, "");
+        return !documentPath.startsWith("/movie/") || documentPath === expectedPath;
+      }
+      const expected = location.pathname.match(/^\/(movie|tv)\/(\d+)/);
+      const documentPath = canonical.pathname.match(/^\/(movie|tv)\/(\d+)/);
+      return !documentPath || (expected?.[1] === documentPath?.[1] && expected?.[2] === documentPath?.[2]);
     } catch {
       return true;
     }
@@ -216,9 +479,14 @@
 
   function domIdentityHint(source = detectSource()) {
     if (!source) return `unsupported:${location.pathname}`;
-    const heading = source === "douban"
-      ? firstText(['#content h1 [property="v:itemreviewed"]', "#content h1"])
-      : firstText(["h1.headline-1.primaryname .name", ".film-header-lockup h1", "h1.headline-1"]);
+    const selectors = {
+      douban: ['#content h1 [property="v:itemreviewed"]', "#content h1"],
+      letterboxd: ["h1.headline-1.primaryname .name", ".film-header-lockup h1", "h1.headline-1"],
+      imdb: ['[data-testid="hero__pageTitle"]', '[data-testid="hero-title-block"] h1', "main h1", "h1"],
+      tmdb: ["h2.title", '[data-testid="hero__pageTitle"]', "main h1", "main h2", "h1"],
+      metacritic: ["main h1", '[class*="product_title"]', "h1"]
+    };
+    const heading = firstText(selectors[source] || []);
     return `${source}:${location.pathname}:${Shared.normalizeTitle(heading)}`;
   }
 
@@ -227,10 +495,31 @@
       return document.querySelector("#content h1") || document.querySelector("#content");
     }
 
-    return document.querySelector(".production-masthead")
-      || document.querySelector(".film-header-lockup")
-      || document.querySelector("h1.headline-1")
-      || document.querySelector("#film-page-wrapper");
+    if (source === "letterboxd") {
+      return document.querySelector(".production-masthead")
+        || document.querySelector(".film-header-lockup")
+        || document.querySelector("h1.headline-1")
+        || document.querySelector("#film-page-wrapper");
+    }
+    if (source === "imdb") {
+      return findImdbFilmHeading()
+        || document.querySelector('[data-testid="hero__pageTitle"]')
+        || document.querySelector('[data-testid="hero-title-block"]')
+        || document.querySelector("main h1")
+        || document.querySelector("main h2")
+        || document.querySelector("h1");
+    }
+    if (source === "metacritic") {
+      return document.querySelector("main h1")
+        || document.querySelector('[class*="product_title"]')
+        || document.querySelector('[class*="productHero"] h1')
+        || document.querySelector("h1");
+    }
+    return document.querySelector("h2.title")
+      || document.querySelector('[data-testid="hero__pageTitle"]')
+      || document.querySelector("main h1")
+      || document.querySelector("main h2")
+      || document.querySelector("#media_v4");
   }
 
   function insertAfter(reference, element) {
@@ -243,18 +532,27 @@
 
   function createRatingElement(key) {
     const definition = RATING_DEFINITIONS[key];
-    const element = document.createElement("div");
+    const element = document.createElement("a");
     element.className = "rating";
     element.dataset.rating = key;
+    element.dataset.link = "false";
     element.style.setProperty("--rating-color", definition.color);
     element.setAttribute("role", "listitem");
     element.innerHTML = `
       <span class="rating-name"></span>
       <strong class="rating-value">—</strong>
       <span class="rating-scale"></span>
+      <span class="rating-arrow" aria-hidden="true">↗</span>
     `;
     element.querySelector(".rating-name").textContent = definition.label;
     element.querySelector(".rating-scale").textContent = `/ ${definition.max}`;
+    element.addEventListener("click", () => {
+      if (element.dataset.link !== "true") return;
+      element.classList.remove("is-activating");
+      void element.offsetWidth;
+      element.classList.add("is-activating");
+      setTimeout(() => element.classList.remove("is-activating"), 460);
+    });
     return element;
   }
 
@@ -262,24 +560,16 @@
     const shadow = host.attachShadow({ mode: "open" });
     const source = film.source;
     const targetSite = source === "douban" ? "letterboxd" : "douban";
-    const targetLabel = Shared.SITES[targetSite].label;
     const fallbackUrl = Shared.buildFallbackUrl(targetSite, film);
 
     shadow.innerHTML = `
       <style></style>
       <section class="ticket" aria-label="跨站电影评分" data-source="${source}">
         <div class="ratings" role="list" aria-label="电影评分"></div>
-        <div class="actions">
-          <a class="jump" rel="noopener noreferrer" data-jump>
-            <span data-button-target></span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
-          </a>
-        </div>
         <span class="sr-status" role="status" aria-live="polite"></span>
       </section>
     `;
     shadow.querySelector("style").textContent = styles;
-    shadow.querySelector("[data-button-target]").textContent = targetLabel;
 
     const ratingsContainer = shadow.querySelector(".ratings");
     for (const key of Object.keys(RATING_DEFINITIONS)) {
@@ -288,13 +578,11 @@
       ratingsContainer.append(ratingElement);
     }
 
-    const jump = shadow.querySelector("[data-jump]");
-    jump.href = fallbackUrl;
-    jump.target = "_blank";
-    jump.setAttribute("aria-label", `在 ${targetLabel} 查看（新标签页）`);
-
     const currentRating = shadow.querySelector(`[data-rating="${source}"]`);
     const targetRating = shadow.querySelector(`[data-rating="${targetSite}"]`);
+    currentRating.dataset.current = "true";
+    setRatingLink(currentRating, null, source, false, false);
+    setRatingLink(targetRating, fallbackUrl, targetSite, true, true);
     updateRatingElement(currentRating, {
       value: film.rating,
       max: RATING_DEFINITIONS[source].max,
@@ -302,7 +590,33 @@
     }, false);
     updateRatingElement(targetRating, null, true);
 
-    return { shadow, jump, targetSite, fallbackUrl };
+    return { shadow, targetSite, fallbackUrl, source };
+  }
+
+  function setRatingLink(element, url, key, isLink, openInNewTab) {
+    if (!element) return;
+    const definition = RATING_DEFINITIONS[key];
+    if (isLink && url) {
+      element.href = url;
+      element.target = openInNewTab ? "_blank" : "_self";
+      element.rel = "noopener noreferrer";
+      element.dataset.link = "true";
+      element.setAttribute("role", "link");
+      element.removeAttribute("aria-disabled");
+      element.removeAttribute("tabindex");
+      element.setAttribute(
+        "aria-label",
+        `在 ${definition.label} 查看电影详情${openInNewTab ? "（新标签页）" : ""}`
+      );
+      return;
+    }
+    element.removeAttribute("href");
+    element.removeAttribute("target");
+    element.removeAttribute("rel");
+    element.dataset.link = "false";
+    element.setAttribute("role", "listitem");
+    element.setAttribute("aria-disabled", "true");
+    element.setAttribute("tabindex", "-1");
   }
 
   function updateRatingElement(element, rating, loading = false) {
@@ -312,6 +626,7 @@
     const valueNode = element.querySelector(".rating-value");
     const scaleNode = element.querySelector(".rating-scale");
     element.dataset.loading = String(Boolean(loading));
+    delete element.dataset.scoreBand;
 
     if (loading) {
       valueNode.textContent = "···";
@@ -324,13 +639,18 @@
     const formatted = Shared.formatRating(rating?.value, rating?.max ?? definition.max);
     valueNode.textContent = formatted ?? "—";
     scaleNode.textContent = `/ ${rating?.max ?? definition.max}`;
+    if (key === "metacritic" && formatted) {
+      const numeric = Number(rating?.value);
+      element.dataset.scoreBand = numeric >= 61 ? "high" : numeric >= 40 ? "mid" : "low";
+    }
     const accessibleLabel = formatted
       ? `${definition.label} ${formatted} / ${rating?.max ?? definition.max}`
       : `${definition.label} 暂无评分`;
+    const currentHint = element.dataset.current === "true" ? "，当前页面评分" : "";
     const hasRatingCount = rating?.count != null && Number.isFinite(Number(rating.count));
     element.setAttribute("aria-label", hasRatingCount && formatted
-      ? `${accessibleLabel}，${Number(rating.count).toLocaleString("zh-CN")} 人评分`
-      : accessibleLabel);
+      ? `${accessibleLabel}，${Number(rating.count).toLocaleString("zh-CN")} 人评分${currentHint}`
+      : `${accessibleLabel}${currentHint}`);
     if (!formatted) {
       element.title = "暂无评分";
     } else if (hasRatingCount) {
@@ -340,27 +660,37 @@
     }
   }
 
-  function isPrimaryRatingVisible(key, source, settings) {
-    if (!PRIMARY_RATING_KEYS.has(key)) return true;
-    const mode = settings?.ratingDisplay?.[source];
-    return mode === "douban" || mode === "letterboxd" ? mode === key : true;
+  function isRatingVisible(key, source, settings) {
+    if (settings?.ratingVisibility && Object.prototype.hasOwnProperty.call(settings.ratingVisibility, key)) {
+      return settings.ratingVisibility[key] !== false;
+    }
+    if (PRIMARY_RATING_KEYS.has(key)) {
+      const mode = settings?.ratingDisplay?.[source];
+      return mode === "douban" || mode === "letterboxd" ? mode === key : true;
+    }
+    if (OPTIONAL_RATING_KEYS.has(key)) {
+      return settings?.externalRatingDisplay?.[key] !== false;
+    }
+    return true;
   }
 
   function applyResolution(widget, response, film) {
-    const { shadow, jump, targetSite, fallbackUrl } = widget;
+    const { shadow, targetSite, fallbackUrl } = widget;
     const srStatus = shadow.querySelector(".sr-status");
     const target = response?.target;
     const targetUrl = target?.url || fallbackUrl;
-    jump.href = targetUrl;
 
     const openInNewTab = response?.settings?.openInNewTab !== false;
-    jump.target = openInNewTab ? "_blank" : "_self";
-    jump.setAttribute(
-      "aria-label",
-      `在 ${Shared.SITES[targetSite].label} 查看${openInNewTab ? "（新标签页）" : ""}`
+    setRatingLink(
+      shadow.querySelector(`[data-rating="${targetSite}"]`),
+      targetUrl,
+      targetSite,
+      true,
+      openInNewTab
     );
 
     const showRatings = response?.settings?.showRatings !== false;
+    shadow.querySelector(".ticket").hidden = !showRatings;
     shadow.querySelector(".ratings").hidden = !showRatings;
 
     for (const [key, definition] of Object.entries(RATING_DEFINITIONS)) {
@@ -370,9 +700,15 @@
           ? { value: film.rating, max: definition.max, count: film.ratingCount }
           : null);
       const external = ["imdb", "tmdb", "metacritic"].includes(key);
+      const isCurrentSite = key === film.source;
       element.hidden = !showRatings
-        || !isPrimaryRatingVisible(key, film.source, response?.settings)
-        || (external && !rating && !response?.configured?.[key]);
+        || !isRatingVisible(key, film.source, response?.settings)
+        || (external && !rating && !response?.configured?.[key] && !isCurrentSite);
+      element.dataset.current = String(isCurrentSite);
+      const ratingUrl = key === targetSite
+        ? targetUrl
+        : rating?.url || null;
+      setRatingLink(element, ratingUrl, key, !isCurrentSite && Boolean(ratingUrl), openInNewTab);
       updateRatingElement(element, rating, false);
     }
 
@@ -456,6 +792,14 @@
     host.style.width = "min(100%, 720px)";
     host.style.maxWidth = "720px";
     host.style.margin = "16px 0 32px";
+    if (source === "imdb" && /\/criticreviews\/?$/i.test(location.pathname)) {
+      host.dataset.layout = "imdb-critic";
+      host.style.clear = "none";
+      host.style.width = "min(52vw, 720px)";
+      host.style.maxWidth = "720px";
+      host.style.margin = "0 0 26px auto";
+      host.style.float = "right";
+    }
 
     if (!insertAfter(mount, host)) {
       mountAttempts += 1;

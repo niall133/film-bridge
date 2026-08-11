@@ -18,7 +18,30 @@
       label: "Letterboxd",
       ratingLabel: "LETTERBOXD",
       maxRating: 5
+    }),
+    imdb: Object.freeze({
+      label: "IMDb",
+      ratingLabel: "IMDB",
+      maxRating: 10
+    }),
+    tmdb: Object.freeze({
+      label: "TMDB",
+      ratingLabel: "TMDB",
+      maxRating: 10
+    }),
+    metacritic: Object.freeze({
+      label: "Metacritic",
+      ratingLabel: "METASCORE",
+      maxRating: 100
     })
+  });
+
+  const SOURCE_HOSTS = Object.freeze({
+    douban: Object.freeze(["movie.douban.com"]),
+    letterboxd: Object.freeze(["letterboxd.com"]),
+    imdb: Object.freeze(["imdb.com", "www.imdb.com"]),
+    tmdb: Object.freeze(["themoviedb.org", "www.themoviedb.org"]),
+    metacritic: Object.freeze(["metacritic.com", "www.metacritic.com"])
   });
 
   function normalizeWhitespace(value) {
@@ -36,7 +59,7 @@
   function cleanTitle(value) {
     return normalizeWhitespace(value)
       .replace(/\s*[·•]\s*(?:Letterboxd|豆瓣电影)\s*$/i, "")
-      .replace(/\s*[-–—]\s*(?:Letterboxd|豆瓣电影)\s*$/i, "")
+      .replace(/\s*[-–—]\s*(?:Letterboxd|豆瓣电影|IMDb|TMDB|Metacritic)\s*$/i, "")
       .replace(/\s*[（(](?:18|19|20|21)\d{2}[）)]\s*$/, "")
       .trim();
   }
@@ -109,6 +132,15 @@
     return parsed;
   }
 
+  function sourceUrlMatches(source, value) {
+    try {
+      const parsed = new URL(String(value ?? ""));
+      return parsed.protocol === "https:" && (SOURCE_HOSTS[source] ?? []).includes(parsed.hostname);
+    } catch {
+      return false;
+    }
+  }
+
   function sanitizeFilmPayload(input) {
     if (!input || !Object.prototype.hasOwnProperty.call(SITES, input.source)) {
       return null;
@@ -118,22 +150,15 @@
     const title = cleanTitle(input.title).slice(0, 180);
     if (!title) return null;
 
-    const expectedHost = source === "douban" ? "movie.douban.com" : "letterboxd.com";
     let pageUrl = null;
-    try {
-      const parsed = new URL(String(input.pageUrl ?? ""));
-      if (parsed.protocol === "https:" && parsed.hostname === expectedHost) {
-        pageUrl = parsed.href;
-      }
-    } catch {
-      pageUrl = null;
-    }
+    if (sourceUrlMatches(source, input.pageUrl)) pageUrl = new URL(String(input.pageUrl)).href;
 
     const rawRatingCount = input.ratingCount;
     const parsedRatingCount = rawRatingCount == null || normalizeWhitespace(rawRatingCount) === ""
       ? null
       : Number(rawRatingCount);
 
+    const maxRating = SITES[source].maxRating;
     return {
       source,
       title,
@@ -143,9 +168,7 @@
       tmdbId: normalizeTmdbId(input.tmdbId),
       tmdbType: input.tmdbType === "tv" ? "tv" : "movie",
       localId: normalizeWhitespace(input.localId).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80) || null,
-      rating: source === "douban"
-        ? finiteRating(input.rating, 0.1, 10)
-        : finiteRating(input.rating, 0.1, 5),
+      rating: finiteRating(input.rating, 0.1, maxRating),
       ratingCount: Number.isFinite(parsedRatingCount) && parsedRatingCount >= 0
         ? Math.round(parsedRatingCount)
         : null,
@@ -177,6 +200,7 @@
 
   return Object.freeze({
     SITES,
+    SOURCE_HOSTS,
     normalizeWhitespace,
     parseYear,
     cleanTitle,
@@ -186,6 +210,7 @@
     normalizeImdbId,
     normalizeTmdbId,
     finiteRating,
+    sourceUrlMatches,
     sanitizeFilmPayload,
     buildFallbackUrl,
     formatRating

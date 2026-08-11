@@ -18,9 +18,23 @@ const DEFAULT_SETTINGS = Object.freeze({
   ratingDisplay: Object.freeze({
     douban: "both",
     letterboxd: "both"
+  }),
+  externalRatingDisplay: Object.freeze({
+    imdb: true,
+    tmdb: true,
+    metacritic: true
+  }),
+  ratingVisibility: Object.freeze({
+    douban: true,
+    letterboxd: true,
+    imdb: true,
+    tmdb: true,
+    metacritic: true
   })
 });
 const RATING_DISPLAY_MODES = new Set(["both", "douban", "letterboxd"]);
+const OPTIONAL_RATING_KEYS = new Set(["imdb", "tmdb", "metacritic"]);
+const RATING_KEYS = ["douban", "letterboxd", "imdb", "tmdb", "metacritic"];
 
 function decodeHtmlEntities(value) {
   const named = {
@@ -94,7 +108,9 @@ function parseJsonLdMovies(html) {
     try {
       for (const item of flattenJsonLd(JSON.parse(raw))) {
         const types = Array.isArray(item["@type"]) ? item["@type"] : [item["@type"]];
-        if (types.some((type) => String(type).toLowerCase() === "movie")) movies.push(item);
+        if (types.some((type) => ["movie", "tvseries", "tvshow", "series"].includes(String(type).toLowerCase()))) {
+          movies.push(item);
+        }
       }
     } catch {
       // Ignore unrelated malformed JSON-LD blocks.
@@ -312,9 +328,12 @@ async function setStorage(items) {
 
 async function readSettings() {
   const stored = await getStorage([SETTINGS_KEY, CREDENTIALS_KEY]);
+  const storedSettings = stored[SETTINGS_KEY] && typeof stored[SETTINGS_KEY] === "object"
+    ? stored[SETTINGS_KEY]
+    : {};
   const settings = {
     ...DEFAULT_SETTINGS,
-    ...(stored[SETTINGS_KEY] ?? {})
+    ...storedSettings
   };
   const cacheHours = Number(settings.cacheHours);
   settings.cacheHours = [6, 24, 72].includes(cacheHours) ? cacheHours : DEFAULT_SETTINGS.cacheHours;
@@ -331,6 +350,31 @@ async function readSettings() {
       ? ratingDisplay.letterboxd
       : DEFAULT_SETTINGS.ratingDisplay.letterboxd
   };
+  const externalRatingDisplay = settings.externalRatingDisplay && typeof settings.externalRatingDisplay === "object"
+    ? settings.externalRatingDisplay
+    : {};
+  settings.externalRatingDisplay = Object.fromEntries(
+    [...OPTIONAL_RATING_KEYS].map((key) => [key, externalRatingDisplay[key] !== false])
+  );
+  const legacyPrimaryVisibility = {
+    douban: ratingDisplay.douban === "letterboxd" ? false : true,
+    letterboxd: ratingDisplay.letterboxd === "douban" ? false : true
+  };
+  const savedVisibility = storedSettings.ratingVisibility && typeof storedSettings.ratingVisibility === "object"
+    ? storedSettings.ratingVisibility
+    : {};
+  settings.ratingVisibility = Object.fromEntries(RATING_KEYS.map((key) => {
+    if (Object.prototype.hasOwnProperty.call(savedVisibility, key)) {
+      return [key, savedVisibility[key] !== false];
+    }
+    if (Object.prototype.hasOwnProperty.call(legacyPrimaryVisibility, key)) {
+      return [key, legacyPrimaryVisibility[key]];
+    }
+    return [key, settings.externalRatingDisplay[key] !== false];
+  }));
+  settings.externalRatingDisplay = Object.fromEntries(
+    [...OPTIONAL_RATING_KEYS].map((key) => [key, settings.ratingVisibility[key] !== false])
+  );
   return {
     settings,
     credentials: {
@@ -356,7 +400,7 @@ async function writeCache(namespace, identity, value) {
   try {
     await setStorage({ [key]: { savedAt: Date.now(), value } });
   } catch {
-    // Storage pressure must never disable the page's immediate jump button.
+    // Storage pressure must never disable the page's immediate rating-card links.
   }
   return value;
 }
@@ -674,6 +718,30 @@ async function hasOptionalOrigin(origin) {
   return chrome.permissions.contains({ origins: [origin] });
 }
 
+function buildImdbCriticReviewsUrl(imdbId) {
+  const normalized = FilmBridgeShared.normalizeImdbId(imdbId);
+  return normalized ? `https://www.imdb.com/title/${normalized}/criticreviews/` : null;
+}
+
+function buildMetacriticUrl(title, year, imdbId = null) {
+  const imdbFallback = buildImdbCriticReviewsUrl(imdbId);
+  if (imdbFallback) return imdbFallback;
+
+  const rawTitle = String(title ?? "").trim();
+  const normalized = rawTitle
+    .normalize("NFKD")
+    .replace(/\p{Mark}/gu, "")
+    .toLocaleLowerCase("en")
+    .replace(/&/g, " and ")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!normalized || !/[a-z0-9]/i.test(normalized)) {
+    return `https://www.metacritic.com/search/${encodeURIComponent(String(title ?? ""))}/`;
+  }
+  const suffix = Number.isFinite(Number(year)) ? `-${Number(year)}` : "";
+  return `https://www.metacritic.com/movie/${normalized}${suffix}/`;
+}
+
 async function fetchOmdbRatings(imdbId, apiKey, cacheHours) {
   if (!imdbId || !apiKey || !(await hasOptionalOrigin("https://www.omdbapi.com/*"))) return {};
   const maxAge = cacheHours * 60 * 60 * 1000;
@@ -786,9 +854,20 @@ async function resolveFilm(input) {
     credentials.tmdbCredential ? hasOptionalOrigin("https://api.themoviedb.org/*") : false
   ]);
 
-  const resolution = film.source === "douban"
-    ? await resolveLetterboxdTarget(film, settings)
-    : await resolveDoubanTarget(film, settings);
+  let resolution;
+  let secondaryLetterboxdResolution = null;
+  if (film.source === "douban") {
+    resolution = await resolveLetterboxdTarget(film, settings);
+  } else if (film.source === "letterboxd") {
+    resolution = await resolveDoubanTarget(film, settings);
+  } else {
+    [resolution, secondaryLetterboxdResolution] = await Promise.all([
+      resolveDoubanTarget(film, settings),
+      settings.ratingVisibility.letterboxd
+        ? resolveLetterboxdTarget(film, settings)
+        : Promise.resolve(null)
+    ]);
+  }
 
   const ratings = {
     [film.source]: film.rating == null ? null : {
@@ -800,25 +879,44 @@ async function resolveFilm(input) {
   };
   const targetSite = film.source === "douban" ? "letterboxd" : "douban";
   if (resolution.rating) ratings[targetSite] = resolution.rating;
+  if (secondaryLetterboxdResolution?.rating) ratings.letterboxd = secondaryLetterboxdResolution.rating;
 
-  const resolvedImdbId = film.imdbId || resolution.remote?.imdbId || null;
-  const resolvedTmdbId = film.tmdbId || resolution.remote?.tmdbId || null;
+  const resolvedImdbId = film.imdbId
+    || resolution.remote?.imdbId
+    || secondaryLetterboxdResolution?.remote?.imdbId
+    || null;
+  const resolvedTmdbId = film.tmdbId
+    || resolution.remote?.tmdbId
+    || secondaryLetterboxdResolution?.remote?.tmdbId
+    || null;
   const resolvedTmdbType = film.tmdbId
     ? film.tmdbType
-    : resolution.remote?.tmdbType || film.tmdbType || "movie";
+    : resolution.remote?.tmdbType
+      || secondaryLetterboxdResolution?.remote?.tmdbType
+      || film.tmdbType
+      || "movie";
 
   if (settings.showRatings) {
+    const wantsOmdb = settings.ratingVisibility.imdb || settings.ratingVisibility.metacritic;
+    const wantsTmdb = settings.ratingVisibility.tmdb;
     const [omdbRatings, tmdbRating] = await Promise.all([
-      fetchOmdbRatings(resolvedImdbId, credentials.omdbApiKey, settings.cacheHours),
-      fetchTmdbRating(
-        resolvedTmdbId,
-        resolvedImdbId,
-        resolvedTmdbType,
-        credentials.tmdbCredential,
-        settings.cacheHours
-      )
+      wantsOmdb
+        ? fetchOmdbRatings(resolvedImdbId, credentials.omdbApiKey, settings.cacheHours)
+        : {},
+      wantsTmdb
+        ? fetchTmdbRating(
+          resolvedTmdbId,
+          resolvedImdbId,
+          resolvedTmdbType,
+          credentials.tmdbCredential,
+          settings.cacheHours
+        )
+        : {}
     ]);
     Object.assign(ratings, omdbRatings, tmdbRating);
+    if (ratings.metacritic && !ratings.metacritic.url) {
+      ratings.metacritic.url = buildMetacriticUrl(film.title, film.year, resolvedImdbId);
+    }
   }
 
   return {
@@ -838,9 +936,21 @@ function senderMatchesFilm(sender, source) {
   const rawUrl = sender?.tab?.url || sender?.url;
   try {
     const url = new URL(rawUrl);
-    return source === "douban"
-      ? url.hostname === "movie.douban.com" && url.pathname.startsWith("/subject/")
-      : url.hostname === "letterboxd.com" && url.pathname.startsWith("/film/");
+    if (source === "douban") return url.hostname === "movie.douban.com" && /^\/subject\/\d+\/?$/.test(url.pathname);
+    if (source === "letterboxd") return url.hostname === "letterboxd.com" && /^\/film\/[^/]+\/?$/.test(url.pathname);
+    if (source === "imdb") {
+      return ["imdb.com", "www.imdb.com"].includes(url.hostname)
+        && /^\/title\/tt\d{5,12}(?:\/criticreviews)?\/?$/i.test(url.pathname);
+    }
+    if (source === "tmdb") {
+      return ["themoviedb.org", "www.themoviedb.org"].includes(url.hostname)
+        && /^\/(?:movie|tv)\/\d+(?:-[^/]+)?\/?$/.test(url.pathname);
+    }
+    if (source === "metacritic") {
+      return ["metacritic.com", "www.metacritic.com"].includes(url.hostname)
+        && /^\/movie\/[^/]+\/?$/.test(url.pathname);
+    }
+    return false;
   } catch {
     return false;
   }
@@ -893,6 +1003,8 @@ if (typeof module !== "undefined" && module.exports) {
     cleanDoubanCandidate,
     scoreDoubanCandidate,
     chooseDoubanCandidate,
+    buildImdbCriticReviewsUrl,
+    buildMetacriticUrl,
     tmdbRequestOptions,
     observationKeys,
     findObservation

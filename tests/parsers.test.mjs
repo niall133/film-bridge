@@ -10,6 +10,8 @@ const {
   chooseDoubanCandidate,
   cleanDoubanCandidate,
   tmdbRequestOptions,
+  buildImdbCriticReviewsUrl,
+  buildMetacriticUrl,
   observationKeys,
   findObservation
 } = require("../src/background.js");
@@ -46,6 +48,71 @@ test("shared utilities preserve a missing rating count as null", () => {
   });
   assert.equal(film.rating, null);
   assert.equal(film.ratingCount, null);
+});
+
+test("shared payload accepts IMDb and TMDB detail pages with source-specific rating scales", () => {
+  const imdb = Shared.sanitizeFilmPayload({
+    source: "imdb",
+    title: "Inception",
+    year: 2010,
+    imdbId: "tt1375666",
+    rating: 8.8,
+    pageUrl: "https://www.imdb.com/title/tt1375666/"
+  });
+  const tmdb = Shared.sanitizeFilmPayload({
+    source: "tmdb",
+    title: "Inception",
+    year: 2010,
+    tmdbId: "27205",
+    rating: 8.3,
+    pageUrl: "https://www.themoviedb.org/movie/27205-inception"
+  });
+  assert.equal(imdb.source, "imdb");
+  assert.equal(imdb.rating, 8.8);
+  assert.equal(tmdb.source, "tmdb");
+  assert.equal(tmdb.tmdbId, "27205");
+  assert.equal(tmdb.rating, 8.3);
+  assert.equal(Shared.sanitizeFilmPayload({
+    source: "tmdb",
+    title: "Inception",
+    pageUrl: "https://example.com/movie/27205-inception"
+  }).pageUrl, null);
+});
+
+test("shared payload accepts a Metacritic movie page and 100-point score", () => {
+  const film = Shared.sanitizeFilmPayload({
+    source: "metacritic",
+    title: "Leviticus",
+    year: 2026,
+    imdbId: "tt22084616",
+    localId: "leviticus",
+    rating: 83,
+    ratingCount: 27,
+    pageUrl: "https://www.metacritic.com/movie/leviticus/"
+  });
+  assert.equal(film.source, "metacritic");
+  assert.equal(film.rating, 83);
+  assert.equal(film.ratingCount, 27);
+  assert.equal(film.pageUrl, "https://www.metacritic.com/movie/leviticus/");
+});
+
+test("Metascore builds a best-effort official Metacritic movie route", () => {
+  assert.equal(
+    buildMetacriticUrl("The Fence", 2025),
+    "https://www.metacritic.com/movie/the-fence-2025/"
+  );
+  assert.equal(
+    buildMetacriticUrl("利未记 Leviticus", 2026, "tt22084616"),
+    "https://www.imdb.com/title/tt22084616/criticreviews/"
+  );
+  assert.equal(
+    buildImdbCriticReviewsUrl("tt22084616"),
+    "https://www.imdb.com/title/tt22084616/criticreviews/"
+  );
+  assert.equal(
+    buildMetacriticUrl("利未记 Leviticus", 2026, "tt33764258"),
+    "https://www.imdb.com/title/tt33764258/criticreviews/"
+  );
 });
 
 test("Letterboxd parser reads CDATA-wrapped Movie JSON-LD and external IDs", () => {

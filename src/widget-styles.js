@@ -14,6 +14,13 @@
       line-height: 1.35;
     }
 
+    :host([data-layout="imdb-critic"]) {
+      width: min(52vw, 720px);
+      max-width: 720px;
+      margin: 0 0 26px auto;
+      float: right;
+    }
+
     *, *::before, *::after {
       box-sizing: border-box;
     }
@@ -25,8 +32,6 @@
       --muted: #78838b;
       --line: rgba(39, 50, 58, 0.16);
       --accent: #007722;
-      --action: #147348;
-      --action-ink: #ffffff;
       position: relative;
       display: flex;
       width: fit-content;
@@ -52,10 +57,24 @@
       --muted: #aab4bc;
       --line: rgba(255, 255, 255, 0.18);
       --accent: #ff8000;
-      --action: #e7edf1;
-      --action-ink: #1f2930;
       color-scheme: dark;
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    }
+
+    .ticket[data-source="imdb"] {
+      --accent: #f5c518;
+    }
+
+    .ticket[data-source="tmdb"] {
+      --accent: #01b4e4;
+    }
+
+    .ticket[data-source="metacritic"] {
+      --accent: #00ce7c;
+    }
+
+    .ticket[hidden] {
+      display: none !important;
     }
 
     .ticket::before {
@@ -81,9 +100,10 @@
 
     .rating {
       display: grid;
-      min-width: 92px;
+      position: relative;
+      min-width: 112px;
       min-height: 56px;
-      padding: 8px 12px 7px;
+      padding: 8px 28px 7px 12px;
       grid-template-columns: auto 1fr;
       grid-template-rows: auto auto;
       column-gap: 4px;
@@ -91,6 +111,54 @@
       border-left: 3px solid var(--rating-color, var(--ink));
       border-radius: 4px;
       background: var(--panel);
+      color: var(--ink);
+      cursor: default;
+      text-decoration: none !important;
+      transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+    }
+
+    .rating[data-link="true"] {
+      cursor: pointer;
+    }
+
+    .rating[data-link="true"]:hover {
+      border-color: var(--rating-color, var(--ink));
+      box-shadow: 0 5px 12px rgba(25, 34, 40, 0.16);
+      transform: translateY(-2px);
+    }
+
+    .rating[data-link="true"]:active {
+      transform: translateY(0) scale(.985);
+    }
+
+    .rating[data-link="true"].is-activating .rating-arrow {
+      opacity: 1;
+      transform: translate(1px, -1px) scale(1.12);
+    }
+
+    .rating[data-link="true"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .rating-arrow {
+      position: absolute;
+      top: 8px;
+      right: 9px;
+      color: var(--rating-color, var(--ink));
+      font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1;
+      opacity: 0;
+      transform: translate(-3px, 3px);
+      transition: opacity 150ms ease, transform 150ms ease;
+    }
+
+    .rating[data-link="true"]:hover .rating-arrow,
+    .rating[data-link="true"]:focus-visible .rating-arrow {
+      opacity: 1;
+      transform: translate(0, 0);
     }
 
     .rating[hidden], .ratings[hidden] {
@@ -99,9 +167,10 @@
 
     .rating-name {
       grid-column: 1 / -1;
+      white-space: nowrap;
       color: var(--muted);
       font-family: "Courier New", "Noto Sans Mono CJK SC", monospace;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.08em;
       line-height: 1;
@@ -115,6 +184,28 @@
       font-weight: 800;
       letter-spacing: -0.045em;
       line-height: 0.98;
+    }
+
+    .rating[data-current="true"] {
+      animation: bridge-current-pulse 2.1s cubic-bezier(.2,.75,.25,1) 1 both;
+    }
+
+    .rating[data-rating="metacritic"] .rating-value {
+      padding: 2px 5px 3px;
+      border-radius: 3px;
+      color: #172126;
+    }
+
+    .rating[data-rating="metacritic"][data-score-band="high"] .rating-value {
+      background: #00ce7c;
+    }
+
+    .rating[data-rating="metacritic"][data-score-band="mid"] .rating-value {
+      background: #ffc107;
+    }
+
+    .rating[data-rating="metacritic"][data-score-band="low"] .rating-value {
+      background: #ff6874;
     }
 
     .rating-scale {
@@ -133,58 +224,6 @@
       background-size: 200% 100%;
       color: transparent;
       animation: bridge-scan 1.15s linear infinite;
-    }
-
-    .actions {
-      flex: 0 0 auto;
-      padding-left: 16px;
-      border-left: 1px solid var(--line);
-    }
-
-    .jump {
-      display: inline-flex;
-      min-width: 122px;
-      min-height: 40px;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px 13px;
-      border-radius: 4px;
-      background: var(--action);
-      color: var(--action-ink);
-      font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 1.15;
-      text-decoration: none !important;
-      transition: transform 150ms ease, filter 150ms ease;
-    }
-
-    .ticket[data-source="letterboxd"] .jump:hover {
-      filter: brightness(1.08);
-    }
-
-    .jump:hover {
-      color: var(--action-ink);
-      filter: brightness(1.08);
-      transform: translateY(-1px);
-      text-decoration: none !important;
-    }
-
-    .jump:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
-
-    .jump svg {
-      width: 14px;
-      height: 14px;
-      flex: 0 0 auto;
-      transition: transform 150ms ease;
-    }
-
-    .jump:hover svg {
-      transform: translate(2px, -2px);
     }
 
     .sr-status {
@@ -207,6 +246,12 @@
       to { background-position: -200% 0; }
     }
 
+    @keyframes bridge-current-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(0, 119, 34, 0); }
+      28% { box-shadow: 0 0 0 4px rgba(0, 119, 34, 0.2); }
+      100% { box-shadow: 0 0 0 0 rgba(0, 119, 34, 0); }
+    }
+
     @media (max-width: 560px) {
       .ticket {
         width: 100%;
@@ -220,14 +265,18 @@
         flex: 0 0 auto;
       }
 
-      .actions {
-        padding: 11px 0 0;
-        border-top: 1px solid var(--line);
-        border-left: 0;
+      :host([data-layout="imdb-critic"]) {
+        width: 100%;
+        max-width: none;
+        margin: 0 0 22px;
+        float: none;
       }
 
-      .jump {
-        width: 100%;
+    }
+
+    @media (min-width: 561px) and (max-width: 900px) {
+      :host([data-layout="imdb-critic"]) {
+        width: min(68vw, 720px);
       }
     }
 
@@ -236,7 +285,7 @@
         animation: none;
       }
 
-      .jump, .jump svg {
+      .rating, .rating-arrow {
         transition: none;
       }
     }
