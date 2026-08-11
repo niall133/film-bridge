@@ -1,11 +1,11 @@
-# Film Bridge · 跨站电影评分
+# Film Bridge · 影评桥
 
-一个无需构建的 Chrome / Edge Manifest V3 扩展：在豆瓣、Letterboxd、IMDb（包括 Critic Reviews 子页）、TMDB 或 Metacritic 的电影页面中，直接嵌入一张轻量评分卡，查看跨站评分并一键打开对应页面。
+影评桥（Film Bridge）是一个无需构建的 Chrome / Edge Manifest V3 扩展：在豆瓣、Letterboxd、IMDb（包括 Critic Reviews 子页）、TMDB 或 Metacritic 的电影页面中，直接嵌入一张轻量评分卡，查看跨站评分并一键打开对应页面。
 
 项目完全在浏览器本地运行，不需要开发者服务器、账号系统或构建工具。核心功能不依赖任何 API Key；OMDb 和 TMDB 只是可选的扩展评分来源。
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-087B50)
-![Version](https://img.shields.io/badge/version-1.0.8-2f6f8f)
+![Version](https://img.shields.io/badge/version-1.0.9-2f6f8f)
 ![License](https://img.shields.io/badge/license-MIT-111111)
 
 ## 现在已经支持
@@ -179,6 +179,8 @@ npm test
 
 ## 当前版本
 
+`v1.0.9`：统一项目品牌为“Film Bridge · 影评桥”，同步更新扩展名称、设置入口、项目文档和 GitHub 仓库名称。
+
 `v1.0.8`：优化 IMDb `/criticreviews/` 页面信息条布局，在宽屏下靠右排列并在窄屏下自动恢复为上下布局。
 
 `v1.0.7`：支持 IMDb `/criticreviews/` 页面注入信息条，并从子页面标题、IMDb ID 和页面评分信息中补全跨站评分入口。
@@ -187,4 +189,4 @@ npm test
 
 ## 免责声明
 
-Film Bridge 是独立的非官方工具，与豆瓣、Letterboxd、IMDb、TMDB、Metacritic、Google 或 Microsoft 不存在隶属、授权、赞助或背书关系。相关名称、商标和服务归各自权利人所有。使用者应自行遵守相关网站的服务条款与所在地区适用的法律法规。
+影评桥（Film Bridge）是独立的非官方工具，与豆瓣、Letterboxd、IMDb、TMDB、Metacritic、Google 或 Microsoft 不存在隶属、授权、赞助或背书关系。相关名称、商标和服务归各自权利人所有。使用者应自行遵守相关网站的服务条款与所在地区适用的法律法规。

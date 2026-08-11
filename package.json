@@ -1,8 +1,8 @@
 {
   "name": "film-bridge-extension",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
-  "description": "A zero-build Chrome MV3 extension embedding cross-site ratings and safe film links for Douban, Letterboxd, IMDb, TMDB and Metacritic.",
+  "description": "Film Bridge (影评桥): a zero-build Chrome MV3 extension embedding cross-site ratings and safe film links for Douban, Letterboxd, IMDb, TMDB and Metacritic.",
   "scripts": {
     "check": "node --check src/shared.js && node --check src/widget-styles.js && node --check src/content.js && node --check src/background.js && node --check src/options.js && node --check src/popup.js",
     "test": "node --test --test-isolation=none"

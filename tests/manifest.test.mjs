@@ -26,7 +26,7 @@ test("release version is synchronized across the extension and project metadata"
   assert.equal(packageJson.version, manifest.version);
   const options = await readFile(path.join(root, "src/options.html"), "utf8");
   const escapedVersion = manifest.version.replaceAll(".", "\\.");
-  assert.match(options, new RegExp(`FILM BRIDGE \/ ${escapedVersion}`));
+  assert.match(options, new RegExp(`FILM BRIDGE(?: · 影评桥)? \/ ${escapedVersion}`));
 });
 
 test("content script is present across all supported film detail sites", () => {
