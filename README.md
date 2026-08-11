@@ -1,12 +1,18 @@
 # Film Bridge · 影评桥
 
+<p align="center">
+  <img src="icons/icon-128.png" width="128" height="128" alt="Film Bridge · 影评桥图标">
+</p>
+
 影评桥（Film Bridge）是一个无需构建的 Chrome / Edge Manifest V3 扩展：在豆瓣、Letterboxd、IMDb（包括 Critic Reviews 子页）、TMDB 或 Metacritic 的电影页面中，直接嵌入一张轻量评分卡，查看跨站评分并一键打开对应页面。
 
 项目完全在浏览器本地运行，不需要开发者服务器、账号系统或构建工具。核心功能不依赖任何 API Key；OMDb 和 TMDB 只是可选的扩展评分来源。
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-087B50)
-![Version](https://img.shields.io/badge/version-1.0.9-2f6f8f)
+![Version](https://img.shields.io/badge/version-1.0.10-2f6f8f)
 ![License](https://img.shields.io/badge/license-MIT-111111)
+
+[隐私政策](PRIVACY.md)
 
 ## 现在已经支持
 
@@ -43,7 +49,7 @@
 
 ### 从 GitHub Release 安装
 
-普通用户不需要下载源码或安装 Node.js。打开仓库的 [Releases](https://github.com/niall133/film-bridge/releases) 页面，下载最新版本的 `film-bridge-v1.0.9.zip`，解压到一个固定文件夹，然后：
+普通用户不需要下载源码或安装 Node.js。打开仓库的 [Releases](https://github.com/niall133/film-bridge/releases) 页面，下载最新版本的 `film-bridge-v1.0.10.zip`，解压到一个固定文件夹，然后：
 
 1. 在 Chrome 地址栏打开 `chrome://extensions`。
 2. 打开右上角“开发者模式”。
@@ -189,6 +195,8 @@ npm test
 如果豆瓣或 Letterboxd 改变页面结构，欢迎提交 Issue，并附上脱敏后的页面结构、浏览器版本和扩展控制台错误；不要上传 Cookie、API Key 或私人观影记录。
 
 ## 当前版本
+
+`v1.0.10`：启用新的 Film Bridge 电影票桥图标，更新 README 品牌展示，并加入公开隐私政策与新版发布压缩包。
 
 `v1.0.9`：统一项目品牌为“Film Bridge · 影评桥”，同步更新扩展名称、设置入口、项目文档和 GitHub 仓库名称。
 

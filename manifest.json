@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Film Bridge · 影评桥",
   "short_name": "影评桥",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "影评桥：在豆瓣、Letterboxd、IMDb、TMDB 与 Metacritic 电影页面内嵌跨站评分卡与安全跳转入口。",
   "minimum_chrome_version": "109",
   "permissions": [
