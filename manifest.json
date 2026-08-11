@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Film Bridge · 豆瓣 ↔ Letterboxd",
+  "name": "Film Bridge · 跨站电影评分",
   "short_name": "Film Bridge",
-  "version": "1.0.1",
-  "description": "在豆瓣与 Letterboxd 电影页内直接显示双向跳转按钮和跨站评分。",
+  "version": "1.0.8",
+  "description": "在豆瓣、Letterboxd、IMDb、TMDB 与 Metacritic 电影页面内嵌跨站评分卡与安全跳转入口。",
   "minimum_chrome_version": "109",
   "permissions": [
     "storage"
@@ -23,7 +23,15 @@
     {
       "matches": [
         "https://movie.douban.com/*",
-        "https://letterboxd.com/*"
+        "https://letterboxd.com/*",
+        "https://www.imdb.com/title/*",
+        "https://imdb.com/title/*",
+        "https://www.themoviedb.org/movie/*",
+        "https://www.themoviedb.org/tv/*",
+        "https://themoviedb.org/movie/*",
+        "https://themoviedb.org/tv/*",
+        "https://www.metacritic.com/movie/*",
+        "https://metacritic.com/movie/*"
       ],
       "js": [
         "src/shared.js",

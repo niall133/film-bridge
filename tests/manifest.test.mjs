@@ -29,10 +29,16 @@ test("release version is synchronized across the extension and project metadata"
   assert.match(options, new RegExp(`FILM BRIDGE \/ ${escapedVersion}`));
 });
 
-test("content script is present across both sites so first client-side film navigation needs no refresh", () => {
+test("content script is present across all supported film detail sites", () => {
   const matches = manifest.content_scripts[0].matches;
   assert.ok(matches.includes("https://movie.douban.com/*"));
   assert.ok(matches.includes("https://letterboxd.com/*"));
+  assert.ok(matches.includes("https://www.imdb.com/title/*"));
+  assert.ok(matches.includes("https://imdb.com/title/*"));
+  assert.ok(matches.includes("https://www.themoviedb.org/movie/*"));
+  assert.ok(matches.includes("https://www.themoviedb.org/tv/*"));
+  assert.ok(matches.includes("https://www.metacritic.com/movie/*"));
+  assert.ok(matches.includes("https://metacritic.com/movie/*"));
   assert.equal(manifest.content_scripts[0].run_at, "document_idle");
 });
 

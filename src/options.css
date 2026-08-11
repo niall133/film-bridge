@@ -139,6 +139,81 @@ h1 {
   gap: 10px;
 }
 
+.rating-visibility {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.18);
+}
+
+.rating-visibility-header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 5px 8px;
+}
+
+.rating-visibility-header strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 15px;
+}
+
+.rating-visibility-header small {
+  color: var(--muted);
+  font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  font-size: 10px;
+}
+
+.rating-visibility-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.tiny-button {
+  padding: 7px 9px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tiny-button:hover,
+.tiny-button:focus-visible {
+  background: var(--ink);
+  color: white;
+}
+
+.rating-switch-row {
+  min-height: 62px;
+  padding: 13px 15px;
+}
+
+#rating-visibility-controls[data-all-off="true"] .rating-switch-row {
+  border-color: #d79d13;
+  background: #f4c34b;
+}
+
+#rating-visibility-controls[data-all-off="true"] .rating-switch-row small {
+  color: #5a3c00;
+}
+
+#rating-visibility-controls[data-all-off="true"] .switch-row i {
+  border-color: #8c5d00;
+  background: #dda316;
+}
+
+#rating-visibility-controls[data-all-off="true"] .switch-row i::after {
+  background: #fff6cf;
+}
+
 .switch-row, .field-row {
   display: grid;
   min-height: 74px;
@@ -268,7 +343,7 @@ h1 {
 
 .secret-field {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   border-bottom: 2px solid var(--ink);
   background: rgba(255,255,255,0.35);
 }
@@ -296,6 +371,19 @@ h1 {
   cursor: pointer;
   font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
   font-size: 10px;
+}
+
+.secret-field .clear-credential {
+  border-left: 1px solid var(--line);
+  color: #a42a22;
+}
+
+.secret-field button:hover {
+  color: var(--ink);
+}
+
+.secret-field .clear-credential:hover {
+  color: #7e1e19;
 }
 
 .api-card > p {

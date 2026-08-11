@@ -69,6 +69,7 @@ h1 span { color: #007722; font-size: 28px; }
 
 .site-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 12px 0;
@@ -84,6 +85,7 @@ h1 span { color: #007722; font-size: 28px; }
 .douban, .green { background: #00a13a; }
 .orange { background: #ff8000; }
 .blue { background: #40bcf4; }
+.yellow { background: #f5c518; }
 
 button {
   display: flex;
