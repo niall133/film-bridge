@@ -1,30 +1,9 @@
 "use strict";
 
-const SETTINGS_KEY = "filmBridge.settings.v1";
+const Shared = globalThis.FilmBridgeShared;
+const SETTINGS_KEY = Shared.SETTINGS_KEY;
 const CREDENTIALS_KEY = "filmBridge.credentials.v1";
-const DEFAULT_SETTINGS = Object.freeze({
-  openInNewTab: true,
-  showRatings: true,
-  cacheHours: 24,
-  ratingDisplay: Object.freeze({
-    douban: "both",
-    letterboxd: "both"
-  }),
-  externalRatingDisplay: Object.freeze({
-    imdb: true,
-    tmdb: true,
-    metacritic: true
-  }),
-  ratingVisibility: Object.freeze({
-    douban: true,
-    letterboxd: true,
-    imdb: true,
-    tmdb: true,
-    metacritic: true
-  })
-});
-const RATING_DISPLAY_MODES = new Set(["both", "douban", "letterboxd"]);
-const RATING_KEYS = ["douban", "letterboxd", "imdb", "tmdb", "metacritic"];
+const RATING_KEYS = Shared.RATING_KEYS;
 
 const form = document.getElementById("settings-form");
 const openInNewTab = document.getElementById("open-in-new-tab");
@@ -38,37 +17,13 @@ const cacheHours = document.getElementById("cache-hours");
 const omdbKey = document.getElementById("omdb-key");
 const tmdbCredential = document.getElementById("tmdb-credential");
 const status = document.getElementById("status");
+let displaySaveQueue = Promise.resolve();
+let displaySaveRevision = 0;
+let pendingDisplaySaves = 0;
 
 function setStatus(message, tone = "") {
   status.textContent = message;
   status.className = tone;
-}
-
-function legacyVisibility(settings) {
-  const ratingDisplay = settings.ratingDisplay && typeof settings.ratingDisplay === "object"
-    ? settings.ratingDisplay
-    : {};
-  const external = settings.externalRatingDisplay && typeof settings.externalRatingDisplay === "object"
-    ? settings.externalRatingDisplay
-    : {};
-  return {
-    douban: ratingDisplay.douban === "letterboxd" ? false : true,
-    letterboxd: ratingDisplay.letterboxd === "douban" ? false : true,
-    imdb: external.imdb !== false,
-    tmdb: external.tmdb !== false,
-    metacritic: external.metacritic !== false
-  };
-}
-
-function readRatingVisibility(settings) {
-  const fallback = legacyVisibility(settings);
-  const saved = settings.ratingVisibility && typeof settings.ratingVisibility === "object"
-    ? settings.ratingVisibility
-    : {};
-  return Object.fromEntries(RATING_KEYS.map((key) => [
-    key,
-    Object.prototype.hasOwnProperty.call(saved, key) ? saved[key] !== false : fallback[key]
-  ]));
 }
 
 function updateRatingVisibilityStatus() {
@@ -78,16 +33,54 @@ function updateRatingVisibilityStatus() {
   const allOn = enabled === RATING_KEYS.length;
   ratingVisibilityControls.dataset.allOff = String(allOff);
   ratingVisibilityStatus.textContent = allOff
-    ? "已关闭全部评分来源"
+    ? "全部来源已关闭，页面评分条已收起"
     : allOn ? "5 个评分来源均已开启" : `已开启 ${enabled} / ${RATING_KEYS.length} 个评分来源`;
 }
 
-function setAllRatingVisibility(checked) {
+function renderRatingControls(settings) {
+  showRatings.checked = settings.showRatings;
   for (const key of RATING_KEYS) {
-    if (ratingSwitches[key]) ratingSwitches[key].checked = checked;
+    ratingSwitches[key].checked = settings.ratingVisibility[key];
   }
   updateRatingVisibilityStatus();
 }
+
+function changeRatingControls(action) {
+  const settings = Shared.changeRatingControls({
+    showRatings: showRatings.checked,
+    ratingVisibility: Object.fromEntries(RATING_KEYS.map((key) => [key, ratingSwitches[key].checked]))
+  }, action);
+  renderRatingControls(settings);
+  const revision = ++displaySaveRevision;
+  pendingDisplaySaves += 1;
+  setStatus("正在保存显示设置…");
+  // Serialize snapshots so fast repeated clicks always leave the last choice saved.
+  displaySaveQueue = displaySaveQueue.catch(() => {}).then(async () => {
+    // Drop superseded clicks before writing, rather than starting a request for every click.
+    if (revision !== displaySaveRevision) return;
+    const stored = await chrome.storage.local.get(SETTINGS_KEY);
+    if (revision !== displaySaveRevision) return;
+    await chrome.storage.local.set({
+      [SETTINGS_KEY]: Shared.normalizeSettings({
+        ...Shared.normalizeSettings(stored[SETTINGS_KEY]),
+        showRatings: settings.showRatings,
+        ratingVisibility: settings.ratingVisibility
+      })
+    });
+    if (revision === displaySaveRevision) setStatus("显示设置已保存，已打开的电影页已同步。", "success");
+  }).catch(() => {
+    if (revision === displaySaveRevision) setStatus("显示设置保存失败，请点击“保存设置”重试。", "error");
+  }).finally(() => {
+    pendingDisplaySaves -= 1;
+  });
+}
+
+// Keep multiple open settings tabs consistent without overwriting unsaved API fields.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[SETTINGS_KEY] && pendingDisplaySaves === 0) {
+    renderRatingControls(Shared.normalizeSettings(changes[SETTINGS_KEY].newValue));
+  }
+});
 
 function containsPermission(origin) {
   return new Promise((resolve) => {
@@ -165,13 +158,10 @@ async function refreshPermissionLabels() {
 
 async function restore() {
   const stored = await chrome.storage.local.get([SETTINGS_KEY, CREDENTIALS_KEY]);
-  const settings = { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] ?? {}) };
+  const settings = Shared.normalizeSettings(stored[SETTINGS_KEY]);
   const credentials = stored[CREDENTIALS_KEY] ?? {};
-  const visibility = readRatingVisibility(settings);
   openInNewTab.checked = settings.openInNewTab !== false;
-  showRatings.checked = settings.showRatings !== false;
-  for (const key of RATING_KEYS) ratingSwitches[key].checked = visibility[key];
-  updateRatingVisibilityStatus();
+  renderRatingControls(settings);
   cacheHours.value = String([6, 24, 72].includes(Number(settings.cacheHours)) ? settings.cacheHours : 24);
   omdbKey.value = String(credentials.omdbApiKey ?? "");
   tmdbCredential.value = String(credentials.tmdbCredential ?? "");
@@ -180,33 +170,43 @@ async function restore() {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setStatus("正在保存并检查 API 权限…");
+  const saveButton = form.querySelector('[type="submit"]');
+  if (saveButton.disabled) return;
+  saveButton.disabled = true;
+  try {
+    setStatus("正在保存并检查 API 权限…");
 
-  const omdbValue = omdbKey.value.trim();
-  const tmdbValue = tmdbCredential.value.trim();
-  const requestedOrigins = [];
-  if (omdbValue) requestedOrigins.push("https://www.omdbapi.com/*");
-  if (tmdbValue) requestedOrigins.push("https://api.themoviedb.org/*");
+    const omdbValue = omdbKey.value.trim();
+    const tmdbValue = tmdbCredential.value.trim();
+    const requestedOrigins = [];
+    if (omdbValue) requestedOrigins.push("https://www.omdbapi.com/*");
+    if (tmdbValue) requestedOrigins.push("https://api.themoviedb.org/*");
 
-  const permissionGranted = await requestPermissions(requestedOrigins);
-  if (!permissionGranted) {
-    setStatus("未获得 API 站点权限。基础双向跳转仍可使用；可稍后再次保存以授权。", "error");
-  }
-
-  await chrome.storage.local.set({
-    [SETTINGS_KEY]: {
-      openInNewTab: openInNewTab.checked,
-      showRatings: showRatings.checked,
-      ratingVisibility: Object.fromEntries(RATING_KEYS.map((key) => [key, ratingSwitches[key].checked])),
-      cacheHours: Number(cacheHours.value)
+    const permissionGranted = await requestPermissions(requestedOrigins);
+    await displaySaveQueue;
+    if (!permissionGranted) {
+      setStatus("未获得 API 站点权限。基础双向跳转仍可使用；可稍后再次保存以授权。", "error");
     }
-  });
 
-  await persistCredentials(omdbValue, tmdbValue);
+    await chrome.storage.local.set({
+      [SETTINGS_KEY]: Shared.normalizeSettings({
+        openInNewTab: openInNewTab.checked,
+        showRatings: showRatings.checked,
+        ratingVisibility: Object.fromEntries(RATING_KEYS.map((key) => [key, ratingSwitches[key].checked])),
+        cacheHours: Number(cacheHours.value)
+      })
+    });
 
-  await refreshPermissionLabels();
-  if (permissionGranted) {
-    setStatus("设置已保存。重新进入或切换到下一部电影时生效。", "success");
+    await persistCredentials(omdbValue, tmdbValue);
+
+    await refreshPermissionLabels();
+    if (permissionGranted) {
+      setStatus("设置已保存，已打开的电影页已同步。", "success");
+    }
+  } catch {
+    setStatus("设置保存失败，请检查扩展是否已重新加载，并重试；API 凭据请勿公开。", "error");
+  } finally {
+    saveButton.disabled = false;
   }
 });
 
@@ -245,15 +245,21 @@ for (const button of document.querySelectorAll("[data-clear-credential]")) {
 }
 
 for (const input of Object.values(ratingSwitches)) {
-  input.addEventListener("change", updateRatingVisibilityStatus);
+  input.addEventListener("change", () => {
+    changeRatingControls({ type: "source", key: input.dataset.ratingSwitch, enabled: input.checked });
+  });
 }
 
+showRatings.addEventListener("change", () => {
+  changeRatingControls({ type: "master", enabled: showRatings.checked });
+});
+
 document.getElementById("enable-all-ratings").addEventListener("click", () => {
-  setAllRatingVisibility(true);
+  changeRatingControls({ type: "all", enabled: true });
 });
 
 document.getElementById("disable-all-ratings").addEventListener("click", () => {
-  setAllRatingVisibility(false);
+  changeRatingControls({ type: "all", enabled: false });
 });
 
 document.getElementById("clear-cache").addEventListener("click", () => {
@@ -267,4 +273,13 @@ document.getElementById("clear-cache").addEventListener("click", () => {
   });
 });
 
-restore().catch(() => setStatus("设置读取失败，请重新打开此页面。", "error"));
+const displayControls = [
+  showRatings,
+  ...Object.values(ratingSwitches),
+  document.getElementById("enable-all-ratings"),
+  document.getElementById("disable-all-ratings")
+];
+for (const control of displayControls) control.disabled = true;
+restore().catch(() => setStatus("设置读取失败，请重新打开此页面。", "error")).finally(() => {
+  for (const control of displayControls) control.disabled = false;
+});

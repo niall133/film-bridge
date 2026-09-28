@@ -17,8 +17,6 @@
     tmdb: { label: "TMDB", max: 10, color: "#01b4e4" },
     metacritic: { label: "METASCORE", max: 100, color: "#56a53f" }
   });
-  const PRIMARY_RATING_KEYS = new Set(["douban", "letterboxd"]);
-  const OPTIONAL_RATING_KEYS = new Set(["imdb", "tmdb", "metacritic"]);
 
   let activePageKey = "";
   let activeFilmSignature = "";
@@ -27,6 +25,12 @@
   let lastDomIdentity = "";
   let mountTimer = null;
   let mountAttempts = 0;
+  let currentSettings = Shared.normalizeSettings();
+  let currentWidget = null;
+  let settingsRevision = 0;
+  const settingsReady = chrome.storage.local.get(Shared.SETTINGS_KEY).then((stored) => {
+    if (settingsRevision === 0) currentSettings = Shared.normalizeSettings(stored[Shared.SETTINGS_KEY]);
+  }).catch(() => {});
 
   function detectSource() {
     if (location.hostname === "movie.douban.com" && /^\/subject\/\d+\/?$/.test(location.pathname)) {
@@ -590,7 +594,10 @@
     }, false);
     updateRatingElement(targetRating, null, true);
 
-    return { shadow, targetSite, fallbackUrl, source };
+    const widget = { host, shadow, targetSite, fallbackUrl, source, film, response: null };
+    applyResolution(widget, null, film);
+    updateRatingElement(targetRating, null, true);
+    return widget;
   }
 
   function setRatingLink(element, url, key, isLink, openInNewTab) {
@@ -660,27 +667,13 @@
     }
   }
 
-  function isRatingVisible(key, source, settings) {
-    if (settings?.ratingVisibility && Object.prototype.hasOwnProperty.call(settings.ratingVisibility, key)) {
-      return settings.ratingVisibility[key] !== false;
-    }
-    if (PRIMARY_RATING_KEYS.has(key)) {
-      const mode = settings?.ratingDisplay?.[source];
-      return mode === "douban" || mode === "letterboxd" ? mode === key : true;
-    }
-    if (OPTIONAL_RATING_KEYS.has(key)) {
-      return settings?.externalRatingDisplay?.[key] !== false;
-    }
-    return true;
-  }
-
   function applyResolution(widget, response, film) {
     const { shadow, targetSite, fallbackUrl } = widget;
     const srStatus = shadow.querySelector(".sr-status");
     const target = response?.target;
     const targetUrl = target?.url || fallbackUrl;
 
-    const openInNewTab = response?.settings?.openInNewTab !== false;
+    const openInNewTab = currentSettings.openInNewTab;
     setRatingLink(
       shadow.querySelector(`[data-rating="${targetSite}"]`),
       targetUrl,
@@ -689,20 +682,17 @@
       openInNewTab
     );
 
-    const showRatings = response?.settings?.showRatings !== false;
-    shadow.querySelector(".ticket").hidden = !showRatings;
-    shadow.querySelector(".ratings").hidden = !showRatings;
+    const showRatings = Shared.hasEnabledRatings(currentSettings);
 
     for (const [key, definition] of Object.entries(RATING_DEFINITIONS)) {
       const element = shadow.querySelector(`[data-rating="${key}"]`);
-      const rating = response?.ratings?.[key]
-        || (key === film.source && film.rating != null
-          ? { value: film.rating, max: definition.max, count: film.ratingCount }
-          : null);
+      const rating = key === film.source && film.rating != null
+        ? { value: film.rating, max: definition.max, count: film.ratingCount }
+        : response?.ratings?.[key] || null;
       const external = ["imdb", "tmdb", "metacritic"].includes(key);
       const isCurrentSite = key === film.source;
       element.hidden = !showRatings
-        || !isRatingVisible(key, film.source, response?.settings)
+        || !currentSettings.ratingVisibility[key]
         || (external && !rating && !response?.configured?.[key] && !isCurrentSite);
       element.dataset.current = String(isCurrentSite);
       const ratingUrl = key === targetSite
@@ -711,6 +701,12 @@
       setRatingLink(element, ratingUrl, key, !isCurrentSite && Boolean(ratingUrl), openInNewTab);
       updateRatingElement(element, rating, false);
     }
+
+    // Collapse the host too: hiding only the inner elements leaves an empty ticket and margins.
+    const hasVisibleCards = [...shadow.querySelectorAll(".rating")].some((element) => !element.hidden);
+    widget.host.hidden = !hasVisibleCards;
+    shadow.querySelector(".ticket").hidden = !hasVisibleCards;
+    shadow.querySelector(".ratings").hidden = !hasVisibleCards;
 
     if (target?.direct) {
       const matchLabels = {
@@ -749,12 +745,19 @@
   }
 
   async function mountForCurrentPage() {
+    await settingsReady;
     const source = detectSource();
     if (!source) {
       document.getElementById(ROOT_ID)?.remove();
       activePageKey = "";
       activeFilmSignature = "";
       mountAttempts = 0;
+      currentWidget = null;
+      return;
+    }
+
+    if (!Shared.hasEnabledRatings(currentSettings)) {
+      if (currentWidget?.host.isConnected) applyResolution(currentWidget, currentWidget.response, currentWidget.film);
       return;
     }
 
@@ -786,6 +789,7 @@
 
     const host = document.createElement("div");
     host.id = ROOT_ID;
+    host.hidden = true;
     host.dataset.filmBridgeOwned = "true";
     host.style.display = "block";
     host.style.clear = "both";
@@ -809,15 +813,44 @@
 
     mountAttempts = 0;
     const widget = createWidget(host, film);
+    currentWidget = widget;
+    await resolveWidget(widget, requestToken);
+  }
+
+  async function resolveWidget(widget, requestToken = ++activeRequestToken) {
     const response = await sendRuntimeMessage({
       type: "FILM_BRIDGE_RESOLVE",
-      payload: film
+      payload: widget.film
     });
 
-    if (requestToken !== activeRequestToken || !host.isConnected) return;
-    if (response?.ok) applyResolution(widget, response, film);
+    if (requestToken !== activeRequestToken || !widget.host.isConnected) return;
+    if (response?.ok) {
+      widget.response = response;
+      applyResolution(widget, response, widget.film);
+    }
     else applyResolutionError(widget);
   }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    const settingsChange = changes[Shared.SETTINGS_KEY];
+    const credentialsChange = changes["filmBridge.credentials.v1"];
+    if (!settingsChange && !credentialsChange) return;
+    if (settingsChange) {
+      settingsRevision += 1;
+      currentSettings = Shared.normalizeSettings(settingsChange.newValue);
+    }
+    activeRequestToken += 1;
+    if (currentWidget?.host.isConnected) {
+      applyResolution(currentWidget, currentWidget.response, currentWidget.film);
+      if (Shared.hasEnabledRatings(currentSettings)) {
+        resolveWidget(currentWidget).catch(() => {});
+      }
+    } else if (Shared.hasEnabledRatings(currentSettings)) {
+      mountAttempts = 0;
+      scheduleMount(0);
+    }
+  });
 
   function scheduleMount(delay = 80) {
     clearTimeout(mountTimer);
@@ -833,6 +866,7 @@
     const urlChanged = location.href !== lastObservedUrl;
     const recoveredAfterExhaustion = Boolean(
       source
+      && Shared.hasEnabledRatings(currentSettings)
       && mountAttempts >= MAX_MOUNT_ATTEMPTS
       && !document.getElementById(ROOT_ID)
       && findMount(source)
@@ -840,12 +874,14 @@
     );
     if (recoveredAfterExhaustion) mountAttempts = 0;
     const rootMissing = Boolean(source)
+      && Shared.hasEnabledRatings(currentSettings)
       && mountAttempts < MAX_MOUNT_ATTEMPTS
       && !document.getElementById(ROOT_ID);
     const nextDomIdentity = domIdentityHint(source);
     const filmIdentityChanged = nextDomIdentity !== lastDomIdentity;
     if (urlChanged) {
       document.getElementById(ROOT_ID)?.remove();
+      currentWidget = null;
       lastObservedUrl = location.href;
       activePageKey = "";
       activeFilmSignature = "";
@@ -867,6 +903,7 @@
   setInterval(() => {
     if (location.href !== lastObservedUrl) {
       document.getElementById(ROOT_ID)?.remove();
+      currentWidget = null;
       lastObservedUrl = location.href;
       activePageKey = "";
       activeFilmSignature = "";

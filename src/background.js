@@ -11,30 +11,6 @@ const SETTINGS_KEY = "filmBridge.settings.v1";
 const CREDENTIALS_KEY = "filmBridge.credentials.v1";
 const CACHE_PREFIX = "filmBridge.cache.v1.";
 const OBSERVED_PREFIX = "filmBridge.observed.v1.";
-const DEFAULT_SETTINGS = Object.freeze({
-  openInNewTab: true,
-  showRatings: true,
-  cacheHours: 24,
-  ratingDisplay: Object.freeze({
-    douban: "both",
-    letterboxd: "both"
-  }),
-  externalRatingDisplay: Object.freeze({
-    imdb: true,
-    tmdb: true,
-    metacritic: true
-  }),
-  ratingVisibility: Object.freeze({
-    douban: true,
-    letterboxd: true,
-    imdb: true,
-    tmdb: true,
-    metacritic: true
-  })
-});
-const RATING_DISPLAY_MODES = new Set(["both", "douban", "letterboxd"]);
-const OPTIONAL_RATING_KEYS = new Set(["imdb", "tmdb", "metacritic"]);
-const RATING_KEYS = ["douban", "letterboxd", "imdb", "tmdb", "metacritic"];
 
 function decodeHtmlEntities(value) {
   const named = {
@@ -328,53 +304,7 @@ async function setStorage(items) {
 
 async function readSettings() {
   const stored = await getStorage([SETTINGS_KEY, CREDENTIALS_KEY]);
-  const storedSettings = stored[SETTINGS_KEY] && typeof stored[SETTINGS_KEY] === "object"
-    ? stored[SETTINGS_KEY]
-    : {};
-  const settings = {
-    ...DEFAULT_SETTINGS,
-    ...storedSettings
-  };
-  const cacheHours = Number(settings.cacheHours);
-  settings.cacheHours = [6, 24, 72].includes(cacheHours) ? cacheHours : DEFAULT_SETTINGS.cacheHours;
-  settings.openInNewTab = settings.openInNewTab !== false;
-  settings.showRatings = settings.showRatings !== false;
-  const ratingDisplay = settings.ratingDisplay && typeof settings.ratingDisplay === "object"
-    ? settings.ratingDisplay
-    : {};
-  settings.ratingDisplay = {
-    douban: RATING_DISPLAY_MODES.has(ratingDisplay.douban)
-      ? ratingDisplay.douban
-      : DEFAULT_SETTINGS.ratingDisplay.douban,
-    letterboxd: RATING_DISPLAY_MODES.has(ratingDisplay.letterboxd)
-      ? ratingDisplay.letterboxd
-      : DEFAULT_SETTINGS.ratingDisplay.letterboxd
-  };
-  const externalRatingDisplay = settings.externalRatingDisplay && typeof settings.externalRatingDisplay === "object"
-    ? settings.externalRatingDisplay
-    : {};
-  settings.externalRatingDisplay = Object.fromEntries(
-    [...OPTIONAL_RATING_KEYS].map((key) => [key, externalRatingDisplay[key] !== false])
-  );
-  const legacyPrimaryVisibility = {
-    douban: ratingDisplay.douban === "letterboxd" ? false : true,
-    letterboxd: ratingDisplay.letterboxd === "douban" ? false : true
-  };
-  const savedVisibility = storedSettings.ratingVisibility && typeof storedSettings.ratingVisibility === "object"
-    ? storedSettings.ratingVisibility
-    : {};
-  settings.ratingVisibility = Object.fromEntries(RATING_KEYS.map((key) => {
-    if (Object.prototype.hasOwnProperty.call(savedVisibility, key)) {
-      return [key, savedVisibility[key] !== false];
-    }
-    if (Object.prototype.hasOwnProperty.call(legacyPrimaryVisibility, key)) {
-      return [key, legacyPrimaryVisibility[key]];
-    }
-    return [key, settings.externalRatingDisplay[key] !== false];
-  }));
-  settings.externalRatingDisplay = Object.fromEntries(
-    [...OPTIONAL_RATING_KEYS].map((key) => [key, settings.ratingVisibility[key] !== false])
-  );
+  const settings = FilmBridgeShared.normalizeSettings(stored[SETTINGS_KEY]);
   return {
     settings,
     credentials: {
@@ -838,6 +768,9 @@ async function resolveFilm(input) {
   if (!film) return { ok: false, error: "INVALID_FILM" };
 
   const { settings, credentials } = await readSettings();
+  if (!FilmBridgeShared.hasEnabledRatings(settings)) {
+    return { ok: true, settings, ratings: {}, configured: {}, target: null };
+  }
   try {
     await saveObservation(film);
   } catch {
@@ -856,13 +789,37 @@ async function resolveFilm(input) {
 
   let resolution;
   let secondaryLetterboxdResolution = null;
+  const targetSite = film.source === "douban" ? "letterboxd" : "douban";
+  const hasCurrentRating = film.rating != null;
+  const wantsOmdb = (
+    settings.ratingVisibility.imdb && !(film.source === "imdb" && hasCurrentRating)
+  ) || (
+    settings.ratingVisibility.metacritic && !(film.source === "metacritic" && hasCurrentRating)
+  );
+  const wantsTmdb = settings.ratingVisibility.tmdb && !(film.source === "tmdb" && hasCurrentRating);
+  const needsRemoteIds = (
+    !film.imdbId && hasOmdbPermission && wantsOmdb
+  ) || (
+    !film.imdbId && !film.tmdbId && hasTmdbPermission && wantsTmdb
+  );
+  const fallbackResolution = {
+    target: { url: FilmBridgeShared.buildFallbackUrl(targetSite, film), direct: false },
+    rating: null,
+    remote: null
+  };
   if (film.source === "douban") {
-    resolution = await resolveLetterboxdTarget(film, settings);
+    resolution = settings.ratingVisibility.letterboxd || needsRemoteIds
+      ? await resolveLetterboxdTarget(film, settings)
+      : fallbackResolution;
   } else if (film.source === "letterboxd") {
-    resolution = await resolveDoubanTarget(film, settings);
+    resolution = settings.ratingVisibility.douban || needsRemoteIds
+      ? await resolveDoubanTarget(film, settings)
+      : fallbackResolution;
   } else {
     [resolution, secondaryLetterboxdResolution] = await Promise.all([
-      resolveDoubanTarget(film, settings),
+      settings.ratingVisibility.douban || needsRemoteIds
+        ? resolveDoubanTarget(film, settings)
+        : Promise.resolve(fallbackResolution),
       settings.ratingVisibility.letterboxd
         ? resolveLetterboxdTarget(film, settings)
         : Promise.resolve(null)
@@ -877,7 +834,6 @@ async function resolveFilm(input) {
       url: film.pageUrl
     }
   };
-  const targetSite = film.source === "douban" ? "letterboxd" : "douban";
   if (resolution.rating) ratings[targetSite] = resolution.rating;
   if (secondaryLetterboxdResolution?.rating) ratings.letterboxd = secondaryLetterboxdResolution.rating;
 
@@ -897,8 +853,6 @@ async function resolveFilm(input) {
       || "movie";
 
   if (settings.showRatings) {
-    const wantsOmdb = settings.ratingVisibility.imdb || settings.ratingVisibility.metacritic;
-    const wantsTmdb = settings.ratingVisibility.tmdb;
     const [omdbRatings, tmdbRating] = await Promise.all([
       wantsOmdb
         ? fetchOmdbRatings(resolvedImdbId, credentials.omdbApiKey, settings.cacheHours)
@@ -914,6 +868,13 @@ async function resolveFilm(input) {
         : {}
     ]);
     Object.assign(ratings, omdbRatings, tmdbRating);
+    // The visible page is fresher than API caches, even when the API supplies another score.
+    if (hasCurrentRating) ratings[film.source] = {
+      value: film.rating,
+      max: FilmBridgeShared.SITES[film.source].maxRating,
+      count: film.ratingCount,
+      url: film.pageUrl
+    };
     if (ratings.metacritic && !ratings.metacritic.url) {
       ratings.metacritic.url = buildMetacriticUrl(film.title, film.year, resolvedImdbId);
     }

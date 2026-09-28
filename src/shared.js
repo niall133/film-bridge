@@ -44,6 +44,58 @@
     metacritic: Object.freeze(["metacritic.com", "www.metacritic.com"])
   });
 
+  const SETTINGS_KEY = "filmBridge.settings.v1";
+  const RATING_KEYS = Object.freeze(Object.keys(SITES));
+
+  function normalizeSettings(input) {
+    const saved = input && typeof input === "object" ? input : {};
+    const legacy = saved.ratingDisplay ?? {};
+    const external = saved.externalRatingDisplay ?? {};
+    const visibility = saved.ratingVisibility ?? {};
+    const fallback = {
+      douban: legacy.douban !== "letterboxd",
+      letterboxd: legacy.letterboxd !== "douban",
+      imdb: external.imdb !== false,
+      tmdb: external.tmdb !== false,
+      metacritic: external.metacritic !== false
+    };
+    const ratingVisibility = Object.fromEntries(RATING_KEYS.map((key) => [
+      key,
+      Object.prototype.hasOwnProperty.call(visibility, key) ? visibility[key] !== false : fallback[key]
+    ]));
+    // Migrate older paused states: an explicitly disabled master now disables every source.
+    if (saved.showRatings === false) {
+      for (const key of RATING_KEYS) ratingVisibility[key] = false;
+    }
+    return {
+      openInNewTab: saved.openInNewTab !== false,
+      showRatings: Object.values(ratingVisibility).some(Boolean),
+      cacheHours: [6, 24, 72].includes(Number(saved.cacheHours)) ? Number(saved.cacheHours) : 24,
+      ratingVisibility,
+      externalRatingDisplay: Object.fromEntries(
+        ["imdb", "tmdb", "metacritic"].map((key) => [key, ratingVisibility[key]])
+      )
+    };
+  }
+
+  function hasEnabledRatings(settings) {
+    const normalized = normalizeSettings(settings);
+    return normalized.showRatings && Object.values(normalized.ratingVisibility).some(Boolean);
+  }
+
+  // The master is always the OR of the sources; toggling it is equivalent to all-on/all-off.
+  function changeRatingControls(settings, action) {
+    const next = normalizeSettings(settings);
+    if (action.type === "all" || action.type === "master") {
+      next.ratingVisibility = Object.fromEntries(RATING_KEYS.map((key) => [key, Boolean(action.enabled)]));
+      next.showRatings = Boolean(action.enabled);
+    } else if (action.type === "source" && RATING_KEYS.includes(action.key)) {
+      next.ratingVisibility[action.key] = Boolean(action.enabled);
+      next.showRatings = Object.values(next.ratingVisibility).some(Boolean);
+    }
+    return normalizeSettings(next);
+  }
+
   function normalizeWhitespace(value) {
     return String(value ?? "")
       .replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000]/g, " ")
@@ -201,6 +253,11 @@
   return Object.freeze({
     SITES,
     SOURCE_HOSTS,
+    SETTINGS_KEY,
+    RATING_KEYS,
+    normalizeSettings,
+    hasEnabledRatings,
+    changeRatingControls,
     normalizeWhitespace,
     parseYear,
     cleanTitle,

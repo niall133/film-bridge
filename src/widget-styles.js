@@ -21,6 +21,11 @@
       float: right;
     }
 
+    :host([hidden]) {
+      display: none !important;
+      margin: 0 !important;
+    }
+
     *, *::before, *::after {
       box-sizing: border-box;
     }

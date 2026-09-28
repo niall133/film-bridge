@@ -4,208 +4,323 @@
   <img src="icons/icon-128.png" width="128" height="128" alt="Film Bridge · 影评桥图标">
 </p>
 
-影评桥（Film Bridge）是一个无需构建的 Chrome / Edge Manifest V3 扩展：在豆瓣、Letterboxd、IMDb（包括 Critic Reviews 子页）、TMDB 或 Metacritic 的电影页面中，直接嵌入一张轻量评分卡，查看跨站评分并一键打开对应页面。
+在电影详情页里，一眼比较评分，一次点击跨站。
 
-项目完全在浏览器本地运行，不需要开发者服务器、账号系统或构建工具。核心功能不依赖任何 API Key；OMDb 和 TMDB 只是可选的扩展评分来源。
+影评桥是一个 Chrome Manifest V3 扩展，在 **豆瓣、Letterboxd、IMDb、TMDB 和 Metacritic** 的电影详情区域内嵌评分卡。无需打开侧栏，无需复制片名；点击评分即可前往对应电影页面，无法确认唯一条目时回退到搜索结果。
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-087B50)
-![Version](https://img.shields.io/badge/version-1.0.10-2f6f8f)
+![Version](https://img.shields.io/badge/version-1.0.12-2f6f8f)
 ![License](https://img.shields.io/badge/license-MIT-111111)
 
-[隐私政策](PRIVACY.md)
+[下载最新安装包](https://github.com/niall133/film-bridge/releases/latest) · [隐私政策](PRIVACY.md) · [反馈问题](https://github.com/niall133/film-bridge/issues) · [更新记录](CHANGELOG.md)
 
-## 现在已经支持
+## 先了解这三点
 
-- 首次进入支持的电影页面即自动插入评分卡；扩展安装或更新时已经打开的旧标签页只需刷新一次。
-- 五个页面来源均支持内嵌评分卡：豆瓣、Letterboxd、IMDb（包括 `/criticreviews/`）、TMDB 和 Metacritic。
-- Metacritic 页面直接读取当前页 Metascore 与评论数；IMDb Critic Reviews 页面保留电影标题区域的整齐右侧布局。
-- 监听 URL 与 DOM 变化，兼容站内无刷新导航；离开电影页时自动移除组件。
-- 豆瓣 → Letterboxd：优先使用 IMDb ID 精准跳转；没有可用外部 ID 时使用片名与年份搜索。
-- Letterboxd → 豆瓣：用片名（包括英文副标题）搜索候选，并用年份、标题相似度与候选差距做置信判断；不确定时宁可打开搜索结果，也不会武断地跳到同名电影。
-- 直接显示当前页面上的豆瓣或 Letterboxd 用户评分。
-- 尽力补全另一站评分；豆瓣页面中观察到的条目、ID 与评分会保存在本地，之后访问相应 Letterboxd 页面可直接复用。
-- 设置页提供豆瓣、Letterboxd、IMDb、TMDB、Metascore 五个独立开关，默认全部开启，并支持“全部打开 / 全部关闭”；全部关闭时会以黄色状态提醒。
-- 评分卡中的 IMDb、TMDB 与 Metascore 评分可点击跳转对应站点；Metascore 使用 Metacritic 风格的绿 / 黄 / 红色分级色块，并统一使用 IMDb ID 的 Critic Reviews 入口，避免本地化片名导致 slug 误判。
-- 设置页提供 OMDb / TMDB 凭据的直接清除按钮；清除后会删除本地凭据并尝试撤销对应的可选权限。
-- 可选接入 OMDb（IMDb + Metacritic）与 TMDB 评分；不填 API 凭据不影响核心双向跳转。
-- 未上映或暂无评分时显示“—”，不会错误地显示为 0 分。
-- 浅色豆瓣页面与深色 Letterboxd 页面分别适配的评分摘要 UI。
-- Shadow DOM 样式隔离、键盘焦点样式、响应式布局和减少动态效果偏好。
+- **不用申请 API 也能使用。** 豆瓣 / Letterboxd 的跨站入口，以及受支持详情页的当前站评分，不需要密钥。
+- **更多评分是可选项。** OMDb 用来补全 IMDb 与 Metascore；TMDB 凭据用来补全 TMDB 评分。扩展没有提供共用密钥。
+- **开关不等于数据可用。** 五个来源默认全开，但外部来源没有凭据、没有可读页面评分或暂无评分时，不保证显示出五个分数。
 
-## 典型使用场景
+扩展没有开发者服务器、登录系统、广告或遥测。设置与缓存保存在当前浏览器本地；安装不需要 Node.js 或构建工具。
 
-- 在豆瓣看完一部电影，想快速打开 Letterboxd 的影评、日志或评分分布。
-- 在 Letterboxd 发现电影，想回到豆瓣查看中文资料、短评和本地评分。
-- 只想在豆瓣页面看 Letterboxd 评分，或只想在 Letterboxd 页面看豆瓣评分。
-- 需要同时参考 IMDb、TMDB 或 Metacritic 的公开评分。
+## 功能与支持页面
 
-## 安装
+- 首次进入支持的详情页即自动嵌入，兼容站内无刷新切换电影。
+- 支持 IMDb 电影详情页及 `/criticreviews/` 专家影评子页。
+- 豆瓣浅色、Letterboxd 深色等页面分别适配；IMDb Critic Reviews 在宽屏使用标题区域右侧布局，窄屏自动堆叠。
+- 五个来源独立控制，支持总开关、全部打开和全部关闭；没有可见评分卡时完全收起，不留空框或额外间距。
+- 点击其他站的评分卡跳转，悬停 / 聚焦 / 点击有箭头反馈；当前站评分不重复跳转，有轻微反馈。
+- Metascore 使用绿、黄、红色分块。跳转优先使用 IMDb ID 的 Critic Reviews 入口，不猜测 Metacritic 的电影网址。
+- 优先展示当前网页读到的评分；缺失评分用“—”表示，不把缺失值当作 0。
+- 可调整缓存时长，可直接删除凭据；支持键盘操作及系统“减少动态效果”偏好。
 
-1. 在 Chrome 地址栏打开 `chrome://extensions`。
-2. 打开右上角“开发者模式”。
-3. 点击“加载已解压的扩展程序”。
-4. 选择解压后的项目根目录（其中应直接包含 `manifest.json`）。
-5. 此后新进入任一支持的电影页面，评分卡会自动出现。
+| 网站 | 支持的页面 |
+|---|---|
+| 豆瓣电影 | `movie.douban.com/subject/电影ID/` |
+| Letterboxd | `letterboxd.com/film/电影名称/` |
+| IMDb | `imdb.com/title/tt序列号/`、`imdb.com/title/tt序列号/criticreviews/` |
+| TMDB | `themoviedb.org/movie/条目ID`，也兼容 `/tv/` 详情页 |
+| Metacritic | `metacritic.com/movie/电影名称/` |
+
+评分开关控制的是**影评桥插入的评分卡**，不会删除或修改网站原本的评分模块，也不会修改用户在网站上的打分。
+
+## 安装与更新
 
 ### 从 GitHub Release 安装
 
-普通用户不需要下载源码或安装 Node.js。打开仓库的 [Releases](https://github.com/niall133/film-bridge/releases) 页面，下载最新版本的 `film-bridge-v1.0.10.zip`，解压到一个固定文件夹，然后：
+1. 打开 [最新 Release](https://github.com/niall133/film-bridge/releases/latest)。
+2. 在 **Assets** 中下载 `film-bridge-v版本号.zip`。不是 `Source code (zip)`，也不是直接把 ZIP 拖入浏览器。
+3. 将 ZIP 完整解压到一个固定文件夹。不要安装后删除或移动该文件夹。
+4. Chrome 地址栏输入 `chrome://extensions`，打开右上角“开发者模式”。
+5. 点击“加载已解压的扩展程序”，选择**直接包含 `manifest.json` 的文件夹**。
+6. 新进入支持的电影详情页，评分卡会自动出现。
 
-1. 在 Chrome 地址栏打开 `chrome://extensions`。
-2. 打开右上角“开发者模式”。
-3. 点击“加载已解压的扩展程序”。
-4. 选择刚才解压后的文件夹；确认所选文件夹的根目录直接包含 `manifest.json`，不要选择 ZIP 文件本身，也不要再进入一层同名子文件夹。
+Edge 使用 `edge://extensions`；Brave 等 Chromium 浏览器也可按相同方式加载。不要选择 ZIP 文件本身或它的上一级空文件夹。
 
-以后发布新版本时，下载新的 ZIP 并解压到新文件夹，再在扩展管理页点击“重新加载”或移除旧版本后重新加载即可。
+源码同样可以直接加载：解压仓库源码后，选择包含 `manifest.json` 的仓库根目录即可。
 
-Chrome 不会把刚安装的内容脚本追溯注入到安装前就已经打开的页面。因此，只有“安装扩展时已经停留在电影页”这一种情况需要刷新一次；安装完成后首次点击进入的新电影页不需要刷新。
+### 更新已有的本地扩展
 
-可用于检查的页面：
+为保留设置和 API 凭据，建议继续使用原来的加载目录：
 
-- 豆瓣：<https://movie.douban.com/subject/3541415/>
-- Letterboxd：<https://letterboxd.com/film/inception/>
-- IMDb：<https://www.imdb.com/title/tt1375666/>
-- IMDb Critic Reviews：<https://www.imdb.com/title/tt33764258/criticreviews/>
-- TMDB：<https://www.themoviedb.org/movie/27205-inception>
-- Metacritic：<https://www.metacritic.com/movie/leviticus/>
+1. 下载新版本 ZIP，解压到临时文件夹。
+2. 将新版本文件复制到**原扩展文件夹**，替换旧的程序文件。
+3. 在扩展管理页点击影评桥的“重新加载”，确认版本号已更新。
+4. 安装 / 更新前已经打开的电影标签页，刷新一次。
 
-支持 Chrome、Edge、Brave 等 Chromium 浏览器。扩展更新后，在扩展管理页点击“重新加载”；已经打开的旧标签页通常需要刷新一次，之后站内无刷新切换电影不需要再次刷新。
+重新加载扩展不会自动把旧页面上的脚本换成新版本；之后正常点击进入的新电影页不需要再次刷新。不要直接卸载再安装来更新：卸载会删除该扩展的本地设置；改变加载目录也可能改变扩展身份。
 
-## 页面内评分卡
+可以用《盗梦空间》检查：
 
-评分卡只保留两类核心操作：
+[豆瓣](https://movie.douban.com/subject/3541415/) · [Letterboxd](https://letterboxd.com/film/inception/) · [IMDb](https://www.imdb.com/title/tt1375666/) · [Critic Reviews](https://www.imdb.com/title/tt1375666/criticreviews/) · [TMDB](https://www.themoviedb.org/movie/27205-inception)
 
-1. 查看当前页面与其他来源的评分。
-2. 点击可跳转的评分卡打开 IMDb、TMDB、豆瓣、Letterboxd 或 Critic Reviews 页面；悬停、聚焦和点击时会显示箭头反馈。
+<a id="settings"></a>
 
-当前所在网站的评分卡保持静态，不会跳转；它会在初次出现时用轻微的边框脉冲提示“这是当前页面评分”。其他可跳转评分卡在悬停、聚焦和点击时显示箭头反馈。
+## 设置详解
 
-卡片会根据所在站点自动切换浅色或深色配色，并在窄屏下改为纵向布局。评分来源、匹配过程和 API 设置不占用页面内容区，统一放在扩展选项页中。
+点击浏览器工具栏的影评桥图标 → **评分来源与设置**。找不到图标时，先点击工具栏的拼图图标；也可从扩展管理页的详情中打开“扩展程序选项”。
 
-## 可选评分设置
+### 1. 显示评分卡与五个来源
 
-点击 Chrome 工具栏里的扩展图标，再进入“评分来源与设置”；也可以在 `chrome://extensions` 的扩展详情中打开选项页。设置页用五个独立开关控制豆瓣、Letterboxd、IMDb、TMDB 与 Metascore 是否显示，并提供一键全开 / 全关。页面内的评分条只保留评分和跨站跳转，不再放置设置入口。
+从 v1.0.12 起，总开关不再存在“关闭了评分卡但来源仍开启”的暂停状态。规则只有一个：**至少一个来源开启，总开关就开启；全部来源关闭，总开关就关闭。**
 
-### OMDb
+| 操作 | 总开关 | 五个来源 | 页面结果 |
+|---|---|---|---|
+| 关闭“显示评分卡” | 关闭 | 全部关闭 | 整条评分卡和占位间距收起 |
+| 开启“显示评分卡” | 开启 | 全部打开 | 按数据可用性显示评分卡 |
+| 点击“全部关闭” | 关闭 | 全部关闭 | 与关闭总开关相同 |
+| 点击“全部打开” | 开启 | 全部打开 | 与开启总开关相同 |
+| 单独开启一个来源 | 自动开启 | 只开启该来源，不改其他来源 | 显示该来源的可用评分卡 |
+| 关闭一个来源，但仍有其他来源开启 | 保持开启 | 只关闭该来源 | 保留其他评分卡 |
+| 关闭最后一个来源 | 自动关闭 | 全部关闭 | 整条评分卡收起 |
 
-填写 [OMDb API Key](https://www.omdbapi.com/apikey.aspx) 后，可以显示：
+全部关闭时，五个来源开关区域会显示黄色，提示“没有选择任何来源”；**黄色不是报错**。开启任一来源后黄色提示消失。
 
-- IMDb 用户评分（10 分制）
-- Metacritic Metascore（100 分制）
+总开关重新开启会打开全部五个来源，**不会恢复之前的部分选择**。如果只想保留一个来源，请在全部关闭后单独打开它。
 
-Metascore 评分卡统一按 IMDb ID 生成 Critic Reviews 地址，例如 `tt33764258` → `https://www.imdb.com/title/tt33764258/criticreviews/`，评分数据本身仍来自 OMDb。
+旧版“总开关关闭、部分来源开启”的设置会按新规则视为全部关闭，避免升级后突然显示评分卡。
 
-### TMDB
+这些显示开关会**自动保存并同步到已打开的电影页**，无需再点击“保存设置”。同时打开多个设置页时，来源状态也会同步。快速连续点击以最后一次选择为准；迟到的评分请求不会把已关闭的卡片重新打开。
 
-填写 [TMDB Read Access Token 或 API Key](https://www.themoviedb.org/settings/api) 后，可以显示 TMDB 用户评分（10 分制）。推荐使用 Read Access Token。
+### 2. 各来源需要什么
 
-API 凭据保存在 `chrome.storage.local`，不会同步到云端，也不会写入电影网站。扩展只在用户保存非空凭据时请求相应 API 域名的可选权限；清空凭据会同时移除权限。
+| 来源开关 | 评分制式 | 不配 API 时 | 跨站补全方式 |
+|---|---|---|---|
+| 豆瓣评分 | 用户平均分 / 10 | 当前豆瓣页可直接读取 | 本地已浏览条目缓存、候选匹配及公开详情页，受安全验证影响 |
+| Letterboxd 评分 | 用户平均分 / 5 | 当前页可读取，其他站尽力解析公开主页面 | IMDb / TMDB ID、标题搜索及本地缓存 |
+| IMDb 评分 | 用户平均分 / 10 | 当前 IMDb 页可直接读取 | OMDb API Key |
+| TMDB 评分 | 用户平均分 / 10 | 当前 TMDB 页可直接读取 | TMDB Read Access Token 或 API Key |
+| Metascore | Metacritic 专家分 / 100 | 当前 Metacritic 电影页可直接读取 | OMDb API Key，与 IMDb 来源共用同一 Key |
 
-## 匹配与评分策略
+开关选项是全局设置，适用于全部支持页面；没有针对不同网站保存不同组合。
 
-| 当前页面 | 目标站匹配 | 评分读取 |
-|---|---|---|
-| 豆瓣 | IMDb `/imdb/{id}/` → 片名与年份搜索 | 当前豆瓣 DOM；Letterboxd 主页面 JSON-LD |
-| Letterboxd | 本地观察缓存 → 豆瓣标题建议 + 年份/相似度 → 搜索 | 当前 Letterboxd JSON-LD；本地豆瓣观察缓存；豆瓣详情页仅尽力抓取 |
-| IMDb | 豆瓣标题建议 + 年份/IMDb 校验；同时尽力读取 Letterboxd | 当前 IMDb JSON-LD / 页面评分；OMDb 可补全 IMDb 与 Metascore |
-| TMDB | 豆瓣标题建议 + 年份；TMDB ID 可用于 Letterboxd 路由 | 当前 TMDB JSON-LD / 页面评分；TMDB API 可补全用户评分 |
-| Metacritic | 豆瓣标题建议 + 年份；可用 IMDb ID 时继续校验 | 当前页 Metascore 与评论数；再由 OMDb / TMDB 补全其他评分 |
+例如只想看 Letterboxd：点“全部关闭” → 只打开“Letterboxd 评分”。在豆瓣和其他支持页面中，影评桥就只保留这个来源。它不会隐藏豆瓣网页自身的豆瓣评分。
 
-豆瓣详情页对扩展后台请求可能触发安全验证，所以“另一站的豆瓣实时评分”不能在纯本地扩展里保证每次都拿到。这个限制不会影响跳转：扩展会优先利用用户正常浏览豆瓣页面时读取并缓存的评分；没有可信评分时保持空值。Letterboxd 则只请求电影主页面，不使用容易触发 Cloudflare 验证的延迟评分接口。
+外部来源未配置 API 且没有可读评分时会隐藏；如果所有已选来源都没有可显示的卡片，整个评分条也会收起。有凭据但数据不可用时可能显示“—”，不代表 0 分。
 
-评分与匹配默认缓存 24 小时，可在设置中改为 6 小时或 3 天。映射失败或 API 暂时不可用时，目标评分卡仍保持可点击的安全回退地址。
+### 3. 在新标签页打开
 
-## 权限说明
+默认开启：点击评分后保留当前电影页，在新标签页打开目标站。关闭后在当前标签页跳转。
 
-- `storage`：保存设置、API 凭据、匹配结果和用户已访问页面中公开可见的评分。
-- `movie.douban.com`：在豆瓣页面插入组件，并由后台请求电影建议。
-- `letterboxd.com`：在 Letterboxd 页面插入组件，并由后台解析主页面公开 JSON-LD。
-- `imdb.com`、`themoviedb.org`：仅用于在对应详情页内嵌评分卡并读取当前页面公开信息。
-- `metacritic.com`：仅用于在电影详情页内嵌信息条并读取页面公开的 Metascore。
-- `www.omdbapi.com`、`api.themoviedb.org`：可选权限，仅在设置对应凭据后请求。
+此选项需要点击“保存设置”。当前网站的评分卡不会跳转，无论此开关如何设置。
 
-没有 `tabs`、浏览历史、Cookie API 或全站网页权限，也没有远程托管代码。
+### 4. 评分缓存
 
-为降低豆瓣建议端点返回“软空结果”的概率，后台建议请求会让浏览器按站点规则自然携带已有豆瓣会话；扩展本身没有 Cookie API 权限，不读取、记录或导出 Cookie 内容。
+默认 **24 小时**，也可选择 **6 小时**或 **3 天**。更短的时长有利于更新评分，但可能产生更多站点 / API 请求；更长的时长更节省请求。
 
-## 本地验证
+更改时长后点击“保存设置”。“清空评分缓存”会立即删除本地匹配与评分缓存，不删除 API 凭据和显示设置；需要立即重新取数时，再刷新电影页或进入下一部电影。
 
-项目没有运行时依赖。Node.js 20+ 可执行：
+显示开关只控制显示与加载，不会删除 API 凭据或已有缓存。全部关闭后不发起新的评分补全请求；关闭之前已经发出的请求可能仍会结束，但不能重新显示卡片。
 
-```powershell
-npm run check
-npm test
-```
+### 5. 哪些操作要保存
 
-测试覆盖：Manifest 引用与权限、五个详情站点的匹配、IMDb Critic Reviews 子页面、Letterboxd CDATA JSON-LD、无效 IMDb 200 页面、未上映空评分、豆瓣 DOM 评分优先级、非电影候选过滤、同名歧义回退、Metascore URL、TMDB 两种凭据格式。
+- **自动保存：** 总开关、五个来源开关、“全部打开 / 全部关闭”。
+- **点击后立即执行：** 凭据旁的“清除”、“清空评分缓存”。
+- **需要点击“保存设置”：** 新标签页选项、缓存时长、填写 / 替换 API 凭据、手动清空凭据输入框。
 
-重新生成图标：
+来源开关自动保存不会顺带保存尚未提交的 Key 或其他选项。
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\generate-icons.ps1
-```
+<a id="api-setup"></a>
 
-## 项目结构
+## API 申请与配置：一步一步
+
+API 是可选的。想在其他网站上稳定补全 IMDb / Metascore，就申请 **OMDb**；想补全 TMDB，就申请 **TMDB**。两者不是同一个服务，Key 不能混用，也不需要申请付费 IMDb 产品的密钥。
+
+下面的申请入口与凭据类型按官方说明整理；网站表单可能调整，字段与套餐以实际申请页为准。不要向本项目提交账号密码、真实 Key 或 Token。
+
+### A. OMDb：IMDb 用户分 + Metascore
+
+#### 申请自己的 Key
+
+1. 用常用邮箱打开 [OMDb API Key 申请页](https://www.omdbapi.com/apikey.aspx)。
+2. 选择适合自己的套餐。目前官方页面提供 **FREE!（每日 1,000 次请求）**，也有 Patreon 方案；额度以申请页为准。
+3. 按免费申请表填写邮箱及页面要求的姓名 / 用途等字段。用途可如实填写“在个人浏览器扩展中查看电影评分”，然后提交。
+4. 查收 OMDb 发来的邮件，包括垃圾邮件文件夹。官方通过邮件分发 Key；如果邮件要求激活，先点击邮件中的激活链接，再使用 Key。
+5. 复制 Key 本身，不要复制邮件中的完整请求网址、激活链接，也不要把 IMDb 的 `tt...` 电影序列号当作 Key。
+
+官方申请页提示部分邮箱可能延迟；长时间未收到时，请使用页面提供的官方联系渠道处理，不要在 GitHub Issue 中公开邮箱或 Key。[OMDb 申请页](https://www.omdbapi.com/apikey.aspx)、[OMDb 官方说明](https://www.omdbapi.com/)。
+
+#### 填入影评桥
+
+1. 打开“评分来源与设置”，找到“更多评分”中的 **OMDb / API Key**。
+2. 粘贴邮件中收到并按要求激活的 Key。需要核对时点“显示”，核对后点“隐藏”。
+3. 点击“保存设置”。浏览器如弹出权限窗口，允许访问 `https://www.omdbapi.com/*`。
+4. 确认“IMDb 评分”和 / 或“Metascore”来源已开启；无需两项同时开启。
+5. 进入支持的电影页检查。已打开的页面会同步设置；若怀疑旧缓存，可清空评分缓存后刷新一次。
+
+**“已授权”只说明浏览器允许访问 OMDb 域名，不会验证 Key 是否有效。** Key 未激活、拼写错误、配额耗尽、服务不可用、影片无 IMDb ID 或 OMDb 未收录，都可能导致没有分数。
+
+Metascore 卡片使用电影的 IMDb ID 跳转，例如：
 
 ```text
-manifest.json
-src/
-  background.js       # 跨站解析、匹配、缓存与可选 API
-  content.js          # 页面识别、即时内联挂载与无刷新导航监听
-  shared.js           # 标题、ID、评分与 URL 的纯函数
-  widget-styles.js    # Shadow DOM 票根样式
-  options.*           # 设置页
-  popup.*             # 工具栏说明与设置入口
-tests/                # Node 内置测试运行器测试
-icons/                # Chrome PNG 图标
-tools/                # 图标生成脚本
+tt33764258 → https://www.imdb.com/title/tt33764258/criticreviews/
 ```
 
-## 数据源边界
+这里是 IMDb 的 Metacritic 影评入口；评分数据仍是 Metacritic 专家分，不是 IMDb 用户分。IMDb 官方付费 API 凭据不能填入 OMDb 字段。
 
-本扩展解析的是网站公开页面结构，豆瓣和 Letterboxd 未记录在案的页面改版可能需要更新选择器。外部评分归各数据源所有；扩展只做即时展示，不批量采集、不上传浏览记录。
+### B. TMDB：用户平均分
 
-Chrome MV3 相关实现遵循官方的[跨域网络请求](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)、[Manifest 图标](https://developer.chrome.com/docs/extensions/reference/manifest/icons)和[设置页](https://developer.chrome.com/docs/extensions/develop/ui/options-page)规范。
+#### 创建账号与申请
+
+1. 在桌面浏览器注册并登录 [TMDB](https://www.themoviedb.org/)。如网站要求，先完成邮箱验证。
+2. 打开 [账户 API 设置](https://www.themoviedb.org/settings/api)，或从头像 / 账户设置中的“API”进入。
+3. 尚未申请时，找到申请 / 创建 API Key 的入口，阅读并接受官方使用条款。个人非商业用途选择对应的开发者申请；商业用途需按 TMDB 官方要求处理。
+4. 按当前表单真实填写应用与联系信息，不要编造资料。若表单要求应用名、网址和简介，可参考以下示例，按自己的实际用途调整：
+
+   | 字段（若申请页要求） | 个人使用影评桥的填写示例 |
+   |---|---|
+   | Application Name | `Film Bridge - Personal Use` |
+   | Application URL | `https://github.com/niall133/film-bridge`（说明使用的开源项目） |
+   | Application Summary | `Personal use of the open-source Film Bridge browser extension to display TMDB movie ratings on movie detail pages. No redistribution or commercial use.` |
+   | 联系信息等其他字段 | 申请者本人的真实信息，以表单要求为准 |
+
+   这不是 TMDB 固定模板，也不保证获批；只有用途确实符合示例时才采用。公开仓库地址不意味着你是项目作者或已获得 TMDB 背书。
+
+5. 提交后按页面提示完成申请。取得凭据后回到 API 设置页。
+6. 找到 **API Read Access Token** 或 **API Key**。影评桥两种均支持，只需复制其中一种；推荐 Read Access Token。
+
+TMDB 官方说明：API 申请在账户设置中进行，建议用桌面浏览器；非商业使用的免费条件与商业申请规则见官方 [Getting Started](https://developer.themoviedb.org/docs/getting-started) 和 [FAQ](https://developer.themoviedb.org/docs/faq)。
+
+#### 填入影评桥
+
+1. 找到“更多评分”中的 **TMDB / Read Access Token 或 API Key**。
+2. 粘贴完整的 **Read Access Token**，不要自行添加 `Bearer ` 前缀、引号或换行。也可直接粘贴 API Key；不要同时填两种。
+3. 不要使用账号密码、临时 Request Token 或 Session ID。这些不是此字段所需的应用凭据。
+4. 点击“保存设置”，如浏览器询问，允许访问 `https://api.themoviedb.org/*`。
+5. 打开“TMDB 评分”来源，再进入电影详情页检查。缺少可用 IMDb / TMDB ID、条目没有用户评分或 API 不可达时，仍可能显示“—”或隐藏。
+
+官方说明 Read Access Token 和 API Key 均可用于应用认证：[TMDB Application Authentication](https://developer.themoviedb.org/docs/authentication-application)。扩展会自动处理认证，不需要用户编写请求代码。
+
+### C. 替换、删除凭据与撤销授权
+
+- **替换：** 输入新 Key / Token → 点击“保存设置”。新凭据仅在保存后生效。
+- **立即删除：** 点击对应输入框旁的“清除”。本地凭据立即删除，同时尝试撤销该 API 域名的可选权限；不必再保存。
+- **手动清空：** 删除输入框文字后点击“保存设置”，同样会删除本地凭据并尝试撤权。
+- **只关闭评分来源：** 不会删除凭据或撤销权限，之后可直接重新开启。
+- **权限没有撤销成功：** 根据设置页提示，在浏览器扩展详情中检查对应站点权限。
+- **在 API 服务端注销 Key：** 请到 OMDb / TMDB 账户或官方渠道操作。扩展的“清除”只删除本机副本，不会注销远端凭据。
+
+凭据存放在 `chrome.storage.local`，不会通过 Chrome Sync 同步，也不会写入电影网站页面。它不是密码保险库或端到端加密存储；请保护浏览器配置文件。凭据仅发送给对应 API 服务用于认证，不发送给项目开发者或其他电影网站。
 
 ## 常见问题
 
-### 为什么评分卡出现了，但另一站评分是“—”？
+### 已打开来源，为什么没有看到对应评分？
 
-跳转和评分是两条独立链路。目标站点可能触发安全验证、限流或暂时没有公开评分；这时扩展仍会保留可用的搜索或详情页入口，不会把缺失评分当成 0 分。
+依次检查：
 
-### 为什么同名电影没有自动直达？
+1. 总开关与该来源是否开启？只看某一来源时，不要再次点总开关开启，否则会恢复全部五个。
+2. 是不是在支持的详情页，而不是搜索页、榜单或个人主页？
+3. 外部评分是否已填写对应凭据、点击保存并允许 API 域名访问？
+4. “已授权”不等于 Key 正确：OMDb 邮件激活、TMDB 凭据类型、配额与网络状态都需要检查。
+5. 影片可能未上映、尚无人评分，或没有可用的外部 ID / 专家评论；缺失值不会变成 0。
+6. 若设置或数据刚改过，清空评分缓存后刷新一次。
 
-当 IMDb / TMDB ID 不足，且片名与年份无法唯一确认时，扩展会打开目标站搜索页，避免把同名电影误认为同一部影片。
+只选了未配置 API 且没有数据的来源时，整条评分卡可能不显示，这是隐藏不可用卡片后的正常结果；来源开关仍保留你的选择。
 
-### API Key 会上传到项目或网站吗？
+### 全部关闭后，为什么网页仍有豆瓣 / IMDb 原生评分？
 
-不会。OMDb / TMDB 凭据只保存在当前浏览器的 `chrome.storage.local`，并只用于请求对应官方 API；设置页的“清除”按钮会直接删除本地凭据并撤销对应权限。项目没有开发者后端，也不会把凭据发送给豆瓣或 Letterboxd。
+开关只管理影评桥自己的评分卡，网站原有模块不在关闭范围内。全部关闭后，影评桥的彩色评分条、阴影和占位间距都会收起。
 
-## 开发与贡献
+### 为什么另一站的豆瓣评分是“—”，但能跳转？
 
-项目没有构建步骤，源码修改后在 `chrome://extensions` 点击“重新加载”即可验证。
+评分读取与页面跳转独立。豆瓣安全验证 / 限流可能阻止后台读取，扩展会尝试复用你正常浏览豆瓣条目时保存的本地数据；没有可信分数就保持空值。打开那部电影的豆瓣页面可帮助补充本地记录，但不能保证绕过站点限制。
 
-提交修改前请运行：
+### 为什么有时打开搜索结果，而不是直接进入电影？
+
+片名和年份不能唯一确认同名电影时，扩展保留安全搜索入口。优先用 IMDb / TMDB ID 或可信本地记录匹配，不会只靠中文片名拼接第三方电影网址。
+
+### 为什么安装 / 更新后旧标签页没有变化？
+
+旧页面仍可能运行旧脚本。扩展管理页重新加载后刷新已有电影页一次；此后新进入的电影页会自动显示。若浏览器限制扩展站点访问，请在扩展详情中允许所支持的站点。
+
+### 不填 API 能做什么？
+
+豆瓣与 Letterboxd 的跨站入口仍可用；支持详情页上可读的当前站评分仍会显示。IMDb / TMDB / Metacritic 的当前页评分不需要为了读取本页再申请 API。跨站补全外部分数才主要依赖可选 API。
+
+### 如何提交问题？
+
+请到 [GitHub Issues](https://github.com/niall133/film-bridge/issues)，提供浏览器版本、扩展版本、公开电影网址、开关组合和脱敏截图。不要公开 Cookie、账号密码、API Key / Token 或含 Key 的完整请求网址。
+
+## 匹配、数据与隐私边界
+
+优先使用可信外部 ID 和本地已观察记录；缺少 ID 时，结合片名、年份、候选差距判断。豆瓣详情页的安全验证、Letterboxd 的访问限制与 API 配额可能使跨站评分暂时不可用。电影网站改版也可能需要更新解析规则。
+
+| 权限 / 域名 | 用途 |
+|---|---|
+| `storage` | 保存显示设置、缓存、公开电影元数据及用户主动填写的凭据 |
+| `movie.douban.com`、`letterboxd.com` | 插入组件及必要的跨站页面匹配 / 评分解析 |
+| IMDb、TMDB、Metacritic 的限定详情页 | 注入组件，读取当前页面公开电影信息 |
+| `www.omdbapi.com`、`api.themoviedb.org` | 可选 API 权限，在保存非空凭据时请求 |
+
+没有全站网页访问、`tabs`、浏览历史或 Cookie API 权限，没有远程执行代码。豆瓣建议请求可能由浏览器按站点规则自然携带已有会话；扩展不读取、记录或导出 Cookie 内容。详细说明见 [PRIVACY.md](PRIVACY.md)。
+
+## 开发、测试与打包
+
+普通用户只需安装 ZIP；开发者才需要 Node.js 20+。
 
 ```powershell
 npm run check
 npm test
 ```
 
-如果豆瓣或 Letterboxd 改变页面结构，欢迎提交 Issue，并附上脱敏后的页面结构、浏览器版本和扩展控制台错误；不要上传 Cookie、API Key 或私人观影记录。
+测试覆盖页面解析、ID 与同名电影匹配、权限和版本同步、Metascore 跳转、缺失评分、五个来源的 32 种组合及总开关联动、旧设置迁移、关闭后的请求抑制。
 
-## 当前版本
+可选浏览器回归需要自行安装 Playwright。测试使用本地模拟页面和模拟扩展 API，不登录网站或发送真实评分请求：
 
-`v1.0.10`：启用新的 Film Bridge 电影票桥图标，更新 README 品牌展示，并加入公开隐私政策与新版发布压缩包。
+```powershell
+node tools/verify-rating-controls.mjs
+```
 
-`v1.0.9`：统一项目品牌为“Film Bridge · 影评桥”，同步更新扩展名称、设置入口、项目文档和 GitHub 仓库名称。
+如果使用自己的 Chrome，可设置 `FILM_BRIDGE_CHROME_PATH`；脚本也接受 Playwright 包路径作为第一个参数。覆盖六种页面布局、空框 / 间距、即时开关、多设置页同步、快速点击、迟到响应、无 API 数据和重新打开设置页。
 
-`v1.0.8`：优化 IMDb `/criticreviews/` 页面信息条布局，在宽屏下靠右排列并在窄屏下自动恢复为上下布局。
+在 Windows 上生成安装包：
 
-`v1.0.7`：支持 IMDb `/criticreviews/` 页面注入信息条，并从子页面标题、IMDb ID 和页面评分信息中补全跨站评分入口。
+```powershell
+npm run package
+```
 
-`v1.0.6`：增加 Metacritic 电影详情页的信息条注入，读取当前页 Metascore、年份和评论数，并继续提供跨站评分入口。
+输出 `dist/film-bridge-v版本号.zip`，根目录直接含 `manifest.json`。只包含扩展运行文件、尺寸图标与文档，不包含 Git、测试、工具或本地凭据。已有同名 ZIP 时脚本会停止，避免悄悄覆盖发布资产。
 
-## 免责声明
+```text
+manifest.json             扩展清单
+src/shared.js             统一设置规则、标题 / ID / 评分工具
+src/background.js         跨站匹配、缓存与可选 API
+src/content.js            详情页识别、挂载和动态导航
+src/widget-styles.js      隔离的页面内评分卡样式
+src/options.*             来源、API 与行为设置
+src/popup.*               工具栏入口
+icons/                    品牌图标
+tests/                    Node 自动测试
+tools/                    图标生成、浏览器回归和发布打包
+PRIVACY.md                公开隐私政策
+CHANGELOG.md               更新记录
+```
 
-影评桥（Film Bridge）是独立的非官方工具，与豆瓣、Letterboxd、IMDb、TMDB、Metacritic、Google 或 Microsoft 不存在隶属、授权、赞助或背书关系。相关名称、商标和服务归各自权利人所有。使用者应自行遵守相关网站的服务条款与所在地区适用的法律法规。
+修改后在扩展管理页重新加载并刷新旧电影页。发布时请同步 `manifest.json`、`package.json`、设置页版本、README 及更新记录。
+
+## 数据来源与免责声明
+
+Film Bridge 是独立的非官方工具，与豆瓣、Letterboxd、IMDb、TMDB、Metacritic、Google 或 Microsoft 无隶属、赞助或背书关系。相关商标与数据属于各自权利人。扩展不批量采集或上传观影记录；用户应遵守数据源的使用条款与配额。
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+[TMDB 官方使用与署名说明](https://developer.themoviedb.org/docs/faq) · [OMDb 官方网站与数据许可](https://www.omdbapi.com/)
