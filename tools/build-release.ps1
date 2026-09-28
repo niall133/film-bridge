@@ -32,6 +32,11 @@ try {
     $name = "icon-$size.png"
     Copy-Item -LiteralPath (Join-Path $projectRoot "icons\$name") -Destination (Join-Path $stagePath "icons\$name")
   }
+  # Bundle the optional high-resolution README graphic without changing the extension icons.
+  $readmeMark = Join-Path $projectRoot "icons\readme-mark.png"
+  if (Test-Path -LiteralPath $readmeMark) {
+    Copy-Item -LiteralPath $readmeMark -Destination (Join-Path $stagePath "icons\readme-mark.png")
+  }
   [System.IO.Compression.ZipFile]::CreateFromDirectory($stagePath, $zipPath)
   $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
   try {

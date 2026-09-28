@@ -1,37 +1,53 @@
-# Film Bridge · 影评桥
-
 <p align="center">
-  <img src="icons/icon-128.png" width="128" height="128" alt="Film Bridge · 影评桥图标">
+  <img src="icons/readme-mark.png" width="104" height="104" alt="Film Bridge · 影评桥 — 五色节点与电影票桥">
 </p>
 
-在电影详情页里，一眼比较评分，一次点击跨站。
+<h1 align="center">Film Bridge · 影评桥</h1>
 
-影评桥是一个 Chrome Manifest V3 扩展，在 **豆瓣、Letterboxd、IMDb、TMDB 和 Metacritic** 的电影详情区域内嵌评分卡。无需打开侧栏，无需复制片名；点击评分即可前往对应电影页面，无法确认唯一条目时回退到搜索结果。
+<p align="center">
+  <strong>跨站电影评分，一眼看齐。</strong>
+</p>
 
-![Manifest V3](https://img.shields.io/badge/Manifest-V3-087B50)
-![Version](https://img.shields.io/badge/version-1.0.12-2f6f8f)
-![License](https://img.shields.io/badge/license-MIT-111111)
+<p align="center">
+  豆瓣 &nbsp;·&nbsp; Letterboxd &nbsp;·&nbsp; IMDb &nbsp;·&nbsp; TMDB &nbsp;·&nbsp; Metacritic
+</p>
 
-[下载最新安装包](https://github.com/niall133/film-bridge/releases/latest) · [隐私政策](PRIVACY.md) · [反馈问题](https://github.com/niall133/film-bridge/issues) · [更新记录](CHANGELOG.md)
+<p align="center">
+  <a href="manifest.json"><img src="https://img.shields.io/badge/Chrome-MV3-0f766e?style=flat-square&amp;labelColor=263238" alt="Chrome Manifest V3"></a>
+  <a href="https://github.com/niall133/film-bridge/releases/latest"><img src="https://img.shields.io/badge/version-1.0.12-0f766e?style=flat-square&amp;labelColor=263238" alt="Version 1.0.12"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0f766e?style=flat-square&amp;labelColor=263238" alt="MIT License"></a>
+</p>
 
-## 先了解这三点
+<p align="center">
+  <a href="https://github.com/niall133/film-bridge/releases/latest"><strong>下载安装</strong></a> &nbsp;·&nbsp;
+  <a href="#installation">安装指南</a> &nbsp;·&nbsp;
+  <a href="#settings">设置说明</a> &nbsp;·&nbsp;
+  <a href="#api-setup">API 申请</a> &nbsp;·&nbsp;
+  <a href="#faq">常见问题</a>
+</p>
 
-- **不用申请 API 也能使用。** 豆瓣 / Letterboxd 的跨站入口，以及受支持详情页的当前站评分，不需要密钥。
-- **更多评分是可选项。** OMDb 用来补全 IMDb 与 Metascore；TMDB 凭据用来补全 TMDB 评分。扩展没有提供共用密钥。
-- **开关不等于数据可用。** 五个来源默认全开，但外部来源没有凭据、没有可读页面评分或暂无评分时，不保证显示出五个分数。
+---
 
-扩展没有开发者服务器、登录系统、广告或遥测。设置与缓存保存在当前浏览器本地；安装不需要 Node.js 或构建工具。
+## 快速了解
+
+影评桥在受支持的电影详情页内嵌轻量评分卡，点击评分即可前往对应电影页面。无需侧栏、无需复制片名；无法确认唯一条目时回退到搜索结果。
+
+| 即装即用 | 按需扩展 | 本地优先 |
+|:---:|:---:|:---:|
+| 基础功能无需密钥 | OMDb / TMDB 可选 | 设置与缓存保存在本机 |
+
+> 来源默认全部开启，但开关不代表数据一定可用。未配置 API、站点限制或影片暂无评分时，不保证显示出五个分数。
+
+[隐私政策](PRIVACY.md) · [反馈问题](https://github.com/niall133/film-bridge/issues) · [更新记录](CHANGELOG.md)
 
 ## 功能与支持页面
 
-- 首次进入支持的详情页即自动嵌入，兼容站内无刷新切换电影。
-- 支持 IMDb 电影详情页及 `/criticreviews/` 专家影评子页。
-- 豆瓣浅色、Letterboxd 深色等页面分别适配；IMDb Critic Reviews 在宽屏使用标题区域右侧布局，窄屏自动堆叠。
-- 五个来源独立控制，支持总开关、全部打开和全部关闭；没有可见评分卡时完全收起，不留空框或额外间距。
-- 点击其他站的评分卡跳转，悬停 / 聚焦 / 点击有箭头反馈；当前站评分不重复跳转，有轻微反馈。
-- Metascore 使用绿、黄、红色分块。跳转优先使用 IMDb ID 的 Critic Reviews 入口，不猜测 Metacritic 的电影网址。
-- 优先展示当前网页读到的评分；缺失评分用“—”表示，不把缺失值当作 0。
-- 可调整缓存时长，可直接删除凭据；支持键盘操作及系统“减少动态效果”偏好。
+- **自动出现：** 首次进入详情页即嵌入，兼容站内无刷新导航，包含 IMDb Critic Reviews 子页。
+- **跨站跳转：** 点击其他站评分打开对应电影；当前站不重复跳转，悬停、聚焦与点击提供轻微反馈。
+- **适配页面：** 豆瓣浅色、Letterboxd 深色分别适配；IMDb Critic Reviews 宽屏靠右，窄屏自动堆叠。
+- **来源可控：** 五个来源独立选择，总开关同步全开 / 全关；无可见卡片时完全收起，不留空框或间距。
+- **尊重数据：** 当前页评分优先，缺失值显示“—”；Metascore 使用绿 / 黄 / 红色块，并优先跳转 IMDb ID 的 Critic Reviews 入口。
+- **细节完善：** 可调整缓存、删除凭据；支持键盘操作及系统“减少动态效果”偏好。
 
 | 网站 | 支持的页面 |
 |---|---|
@@ -42,6 +58,8 @@
 | Metacritic | `metacritic.com/movie/电影名称/` |
 
 评分开关控制的是**影评桥插入的评分卡**，不会删除或修改网站原本的评分模块，也不会修改用户在网站上的打分。
+
+<a id="installation"></a>
 
 ## 安装与更新
 
@@ -143,7 +161,7 @@ Edge 使用 `edge://extensions`；Brave 等 Chromium 浏览器也可按相同方
 
 ## API 申请与配置：一步一步
 
-API 是可选的。想在其他网站上稳定补全 IMDb / Metascore，就申请 **OMDb**；想补全 TMDB，就申请 **TMDB**。两者不是同一个服务，Key 不能混用，也不需要申请付费 IMDb 产品的密钥。
+API 是可选的。想在其他网站上稳定补全 IMDb / Metascore，就申请 **OMDb**；想补全 TMDB，就申请 **TMDB**。两者不是同一个服务，Key 不能混用，也不需要申请付费 IMDb 产品的密钥。扩展不提供共用密钥；凭据由用户自行申请。
 
 下面的申请入口与凭据类型按官方说明整理；网站表单可能调整，字段与套餐以实际申请页为准。不要向本项目提交账号密码、真实 Key 或 Token。
 
@@ -221,9 +239,12 @@ TMDB 官方说明：API 申请在账户设置中进行，建议用桌面浏览�
 
 凭据存放在 `chrome.storage.local`，不会通过 Chrome Sync 同步，也不会写入电影网站页面。它不是密码保险库或端到端加密存储；请保护浏览器配置文件。凭据仅发送给对应 API 服务用于认证，不发送给项目开发者或其他电影网站。
 
+<a id="faq"></a>
+
 ## 常见问题
 
-### 已打开来源，为什么没有看到对应评分？
+<details>
+<summary><strong>已打开来源，为什么没有看到对应评分？</strong></summary>
 
 依次检查：
 
@@ -236,29 +257,49 @@ TMDB 官方说明：API 申请在账户设置中进行，建议用桌面浏览�
 
 只选了未配置 API 且没有数据的来源时，整条评分卡可能不显示，这是隐藏不可用卡片后的正常结果；来源开关仍保留你的选择。
 
-### 全部关闭后，为什么网页仍有豆瓣 / IMDb 原生评分？
+</details>
+
+<details>
+<summary><strong>全部关闭后，为什么网页仍有豆瓣 / IMDb 原生评分？</strong></summary>
 
 开关只管理影评桥自己的评分卡，网站原有模块不在关闭范围内。全部关闭后，影评桥的彩色评分条、阴影和占位间距都会收起。
 
-### 为什么另一站的豆瓣评分是“—”，但能跳转？
+</details>
+
+<details>
+<summary><strong>为什么另一站的豆瓣评分是“—”，但能跳转？</strong></summary>
 
 评分读取与页面跳转独立。豆瓣安全验证 / 限流可能阻止后台读取，扩展会尝试复用你正常浏览豆瓣条目时保存的本地数据；没有可信分数就保持空值。打开那部电影的豆瓣页面可帮助补充本地记录，但不能保证绕过站点限制。
 
-### 为什么有时打开搜索结果，而不是直接进入电影？
+</details>
+
+<details>
+<summary><strong>为什么有时打开搜索结果，而不是直接进入电影？</strong></summary>
 
 片名和年份不能唯一确认同名电影时，扩展保留安全搜索入口。优先用 IMDb / TMDB ID 或可信本地记录匹配，不会只靠中文片名拼接第三方电影网址。
 
-### 为什么安装 / 更新后旧标签页没有变化？
+</details>
+
+<details>
+<summary><strong>为什么安装 / 更新后旧标签页没有变化？</strong></summary>
 
 旧页面仍可能运行旧脚本。扩展管理页重新加载后刷新已有电影页一次；此后新进入的电影页会自动显示。若浏览器限制扩展站点访问，请在扩展详情中允许所支持的站点。
 
-### 不填 API 能做什么？
+</details>
+
+<details>
+<summary><strong>不填 API 能做什么？</strong></summary>
 
 豆瓣与 Letterboxd 的跨站入口仍可用；支持详情页上可读的当前站评分仍会显示。IMDb / TMDB / Metacritic 的当前页评分不需要为了读取本页再申请 API。跨站补全外部分数才主要依赖可选 API。
 
-### 如何提交问题？
+</details>
+
+<details>
+<summary><strong>如何提交问题？</strong></summary>
 
 请到 [GitHub Issues](https://github.com/niall133/film-bridge/issues)，提供浏览器版本、扩展版本、公开电影网址、开关组合和脱敏截图。不要公开 Cookie、账号密码、API Key / Token 或含 Key 的完整请求网址。
+
+</details>
 
 ## 匹配、数据与隐私边界
 
